@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}
+  Lista Botów | STOCKstorm
+{% endblock %}
+
+{% block content %}
+<div style="margin: 1rem;">
+  <h2 style="margin-bottom: 1rem;">Twoje Boty</h2>
+  
+  <!-- Przycisk dodania nowego bota -->
+  <div style="margin-bottom: 1rem;">
+    <a href="{% url 'bot_add' %}" style="background: #007bff; color: #fff; padding: 10px 15px; border-radius: 5px; text-decoration: none;">Dodaj nowego bota</a>
+  </div>
+
+  <!-- Przykładowa tabela z botami -->
+  <table>
+    <thead>
+      <tr>
+        <th>Bot ID</th>
+        <th>Nazwa</th>
+        <th>Aktywo</th>
+        <th>Status</th>
+        <th>Kapitał</th>
+        <th>Akcje</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for bot in bots %}
+      <tr>
+        <td>{{ bot.id }}</td>
+        <td>{{ bot.name }}</td>
+        <td>{{ bot.instrument }}</td>
+        <td>{{ bot.status }}</td>
+        <td>{{ bot.capital }}</td>
+        <td>
+          <!-- Szczegóły bota -->
+          <a href="{% url 'bot_detail' bot.id %}" style="margin-right:10px;">Szczegóły</a>
+          <!-- Usuń / zatrzymaj bota -->
+          <form action="{% url 'bot_remove' bot.id %}" method="post" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" style="background:#dc3545; color:#fff; padding:5px 10px; border-radius:5px; cursor:pointer;">Usuń</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" style="text-align:center;">Brak botów do wyświetlenia.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

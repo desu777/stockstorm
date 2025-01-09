@@ -1,0 +1,60 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>{% block title %}Admin Dashboard | STOCKstorm{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/base.css' %}" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css" />
+</head>
+<body>
+  <script src="{% static 'js/dashboard.js' %}"></script>
+  <header class="header">
+    <div class="logo">
+      <a href="#">STOCKstorm</a>
+    </div>
+    <div class="utc-time">
+      <i class="fas fa-clock"></i> <span id="utc-time">Loading...</span>
+    </div>
+    <div class="header-icons">
+        <div class="status">
+          {% if request.is_live %}
+          <i class="fas fa-circle" style="color: green;"></i> LIVE
+            {% else %}
+            <i class="fas fa-circle" style="color: red;"></i> OFFLINE
+          {% endif %}
+        </div>
+        <form action="{% url 'logout' %}" method="POST" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" title="Logout" style="background: none; border: none; cursor: pointer;">
+                <i class="fas fa-sign-out-alt logout-icon"></i>
+            </button>
+        </form>
+        <i class="fas fa-bell"></i>
+        <div class="account">
+            <img src="{% static 'images/ava.jpg' %}" alt="Profile Image">
+            <h4>{{ user.username }}</h4>
+        </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <nav>
+      <div class="side_navbar">
+        <span>Main Menu</span>
+        <a href="{% url 'dashboard' %}" class="active">Dashboard</a>
+        <a href="{% url 'profile' %}">Profile</a>
+        <a href="{% url 'history' %}">History</a>
+        <a href="{% url 'show_symbols' %}"> Tickers</a>
+        <a href="{% url 'bot_list' %}">51015</a>
+      </div>
+    </nav>
+
+    <div class="main-body">
+      {% block content %}
+      <!-- Page-specific content will go here -->
+      {% endblock %}
+    </div>
+  </div>
+</body>
+</html>

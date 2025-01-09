@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Transaction History</h1>
+<script>
+    // Automatyczne odświeżanie co minutę
+    setInterval(() => {
+        location.reload();
+    }, 60000); // 60000 ms = 1 minuta
+</script>
+<form method="get" style="margin-bottom: 1rem;">
+    <button type="submit" style="padding: 8px 12px; background: #007bff; color: #fff; border: none; border-radius: 5px;">Odśwież Historię</button>
+</form>
+
+<table>
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Date</th>
+            <th>Type</th>
+            <th>Instrument</th>
+            <th>Amount</th>
+            <th>Profit/Loss</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for trade in history %}
+        <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ trade.close_time|date:"Y-m-d H:i" }}</td>
+            <td>{{ trade.type }}</td>
+            <td>{{ trade.instrument }}</td>
+            <td>{{ trade.amount }}</td>
+            <td>
+                {% if trade.profit > 0 %}
+                    <span style="color: green;">+{{ trade.profit }}</span>
+                {% else %}
+                    <span style="color: red;">{{ trade.profit }}</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="6" style="text-align:center;">No transactions available.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STOCKSTORM</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+</head>
+<body>
+    <!-- Tło strony -->
+    <div class="background">
+        <!-- Przyciski Log In i Sign Up -->
+        <div class="buttons">
+            <a href="{% url 'login' %}" class="button">Log In</a>
+            <a href="{% url 'register' %}" class="button">Sign Up</a>
+        </div>
+    </div>
+</body>
+</html>

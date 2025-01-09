@@ -1,0 +1,33 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Page</title>
+    <link rel="stylesheet" href="{% static 'css/form.css' %}">
+</head>
+<body>
+    <div class="glass-container">
+        <div class="login-box">
+            <form action="#" method="POST">
+                {% csrf_token %} <!-- Dodano token CSRF -->
+
+                <input type="text" id="username" name="username" required placeholder="Username">
+                
+                <input type="password" id="password" name="password" required placeholder="Password">
+                
+                <div class="options">
+                    <input type="checkbox" id="remember" name="remember">
+                    <label for="remember">Remember me</label>
+                    <a href="{% url 'forgot' %}">Forgot Password?</a>
+                </div>
+                
+                <button type="submit">Login</button>
+
+                <p>Don't have an account? <a href="{% url 'register' %}" id="register">Register</a></p>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

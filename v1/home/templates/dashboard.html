@@ -1,0 +1,191 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Dashboard | STOCKstorm</title>
+  <link rel="stylesheet" href="{% static 'css/dashboard.css' %}" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css" />
+  
+</head>
+<body>
+  <script src="{% static 'js/dashboard.js' %}"></script>
+  <script>
+    function fetchBalanceData() {
+    fetch("{% url 'balance_data' %}")
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          console.error("Error fetching balance data:", data.error);
+          return;
+        }
+        document.getElementById("balance-value").textContent = data.balance ?? "N/A";
+        document.getElementById("equity-value").textContent = data.equity ?? "N/A";
+        document.getElementById("margin-value").textContent = data.margin ?? "N/A";
+        document.getElementById("margin-free-value").textContent = data.margin_free ?? "N/A";
+        document.getElementById("margin-level-value").textContent = data.margin_level ?? "N/A";
+        document.getElementById("balance-currency").textContent = data.currency ?? "";
+      })
+      .catch(error => console.error("Error:", error));
+    }
+    setInterval(fetchBalanceData, 1000);
+    fetchBalanceData();
+  </script>
+  <header class="header">
+    <div class="logo">
+      <a href="#">STOCKstorm</a>
+      <div class="search_box">
+        <input type="text" id="symbol-input" placeholder="Search Instruments">
+        <i class="fa-sharp fa-solid fa-magnifying-glass" id="search-icon"></i>
+      </div>
+    </div>
+    <div class="utc-time">
+      <i class="fas fa-clock"></i> <span id="utc-time">Loading...</span>
+  </div>
+    <div class="header-icons">
+        <div class="status">
+            {% if is_live %}
+            <i class="fas fa-circle" style="color: green;"></i> LIVE
+            {% else %}
+            <i class="fas fa-circle" style="color: red;"></i> NOT LIVE
+            {% endif %}
+        </div>
+        <form action="{% url 'logout' %}" method="POST" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" title="Logout" style="background: none; border: none; cursor: pointer;">
+                <i class="fas fa-sign-out-alt logout-icon"></i>
+            </button>
+        </form>
+        <i class="fas fa-bell"></i>
+        <div class="account">
+            <img src="{% static 'images/ava.jpg' %}" alt="Profile Image">
+            <h4>{{ user.username }}</h4>
+        </div>
+    </div>
+  </header>
+    
+
+  <div class="container">
+    <nav>
+      <div class="side_navbar">
+        <span>Main Menu</span>
+        <a href="{% url 'dashboard' %}" class="active">Dashboard</a>
+        <a href="{% url 'profile' %}">Profile</a>
+        <a href="{% url 'history' %}">History</a>
+        <a href="{% url 'show_symbols' %}"> Tickers</a>
+        <a href="{% url 'bot_list' %}">51015</a>
+      </div>
+    </nav>
+
+    <div class="main-body">
+      <h2>Dashboard</h2>
+      <div class="promo_card">
+        <h1>Welcome to STOCKstorm</h1>
+        <span>First trading platform with personal bots.</span>
+      </div>
+
+      <div class="history_lists">
+        <div class="list1">
+          <div class="row">
+            <h4>History</h4>
+            <a href="{% url 'history' %}">See all</a>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Dates</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in history %}
+              <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ item.date }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.type }}</td>
+                <td>${{ item.amount }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="list3">
+          <div class="row">
+            <h4>STOCK MARKETS STATUS (UTC)</h4>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Market</th>
+                <th>Status</th>
+                <th>Time to Open</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for stock in stocks %}
+              <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ stock.name }}</td>
+                <td class="{{ stock.css_class }}">{{ stock.status }}</td>
+                <td>{{ stock.time_to_open }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="4">No stock market data available.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        
+
+
+        <div class="list2">
+          <div class="row">
+            <h4>Documents</h4>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Uploaded</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for doc in documents %}
+              <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ doc.title }}</td>
+                <td>{{ doc.type }}</td>
+                <td>{{ doc.uploaded }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+      <div class="account-balance-section">
+        <h4>Account Balance</h4>
+        <div id="account-balance">
+            <p>Balance: <span id="balance-value">Loading...</span> <span id="balance-currency"></span></p>
+            <p>Equity: <span id="equity-value">Loading...</span></p>
+            <p>Margin: <span id="margin-value">Loading...</span></p>
+            <p>Free Margin: <span id="margin-free-value">Loading...</span></p>
+            <p>Margin Level: <span id="margin-level-value">Loading...</span>%</p>
+        </div>
+      </div>
+  </div>
+
+  
+</body>
+</html>

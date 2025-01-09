@@ -1,0 +1,286 @@
+# api/views.py
+from django.shortcuts import render
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from decimal import Decimal
+import json
+from django.db import transaction
+from .models import MicroserviceBot  # Usuwamy import UserProfile (niepotrzebny)
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from .models import *
+import json
+from rest_framework.authtoken.models import Token
+from django.conf import settings
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from .models import UserProfile
+from rest_framework.exceptions import AuthenticationFailed
+
+class CustomAuthentication(TokenAuthentication):
+    def authenticate_credentials(self, key):
+        try:
+            user_profile = UserProfile.objects.get(auth_token=key)
+            return (user_profile.user, key)
+        except UserProfile.DoesNotExist:
+            raise AuthenticationFailed('Invalid token')
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def register(request):
+    """
+    Endpoint do rejestrowania tokena użytkownika w mikroserwisie.
+    Oczekuje nagłówka Authorization: Bearer <MICROSERVICE_API_TOKEN>
+    """
+    # 1. Pobierz nagłówek Authorization
+    auth_header = request.headers.get('Authorization')
+
+    print("\n--- [register] START ---")
+    print("[register] Received POST to /register")
+    print("[register] Request HEADERS =>", dict(request.headers))
+    print("[register] Request DATA =>", request.data)
+
+    if not auth_header:
+        print("[register] -> Brak nagłówka Authorization => 401\n")
+        return Response({'error': 'Missing Authorization header'}, status=401)
+
+    # 2. Sprawdź, czy nagłówek jest w formie "Bearer <token>"
+    expected_value = f"Bearer {settings.MICROSERVICE_API_TOKEN}"
+    print(f"[register] Auth header = {auth_header}")
+    print(f"[register] Expected    = {expected_value}")
+
+    if auth_header != expected_value:
+        print("[register] -> Niepoprawny token => 403\n")
+        return Response({'error': 'Invalid or missing microservice token'}, status=403)
+
+    # 3. Gdy autoryzacja OK, przechodzimy do logiki rejestrującej
+    user_id = request.data.get('user_id')
+    token = request.data.get('token')
+
+    if not user_id or not token:
+        print("[register] -> user_id lub token nieobecny => 400\n")
+        return Response({'error': 'user_id and token are required'}, status=400)
+
+    user_profile, created = UserProfile.objects.get_or_create(user_id=user_id)
+    user_profile.auth_token = token
+    user_profile.save()
+
+    print("[register] -> UserProfile", "utworzony" if created else "zaktualizowany", f"dla user_id={user_id}")
+    print("[register] Zapisany token =", token)
+    print("--- [register] KONIEC ---\n")
+
+    return Response({'status': 'Token saved successfully'})
+
+@api_view(['POST'])
+@authentication_classes([CustomAuthentication])
+@permission_classes([IsAuthenticated])
+def create_bot(request):
+    """
+    Tworzy bota w mikroserwisie – brak rezerwacji salda!
+    """
+    user_id = request.data.get('user_id')
+    name = request.data.get('name')
+    instrument = request.data.get('instrument')
+    min_price = request.data.get('min_price')
+    max_price = request.data.get('max_price')
+    percent = request.data.get('percent')
+    capital = request.data.get('capital')
+    stream_session_id = request.data.get('stream_session_id', '')
+
+    # Walidacja danych wejściowych
+    if not user_id or not instrument or not min_price or not max_price:
+        return Response({"error": "Missing required fields"}, status=400)
+
+    min_price = Decimal(min_price)
+    max_price = Decimal(max_price)
+    capital = Decimal(capital) if capital else Decimal("0")
+    percent = int(percent)
+
+    # Generujemy "levels_data"
+    levels = generate_levels(min_price, max_price, percent, capital)
+
+    # Tworzenie bota w bazie
+    # (Bez żadnego rezerwowania salda)
+    bot = MicroserviceBot.objects.create(
+        user_id=user_id,
+        name=name,
+        instrument=instrument,
+        min_price=min_price,
+        max_price=max_price,
+        percent=percent,
+        capital=capital,
+        stream_session_id=stream_session_id,
+        status='RUNNING',
+        # ewentualnie zapisz levels_data w polu
+        levels_data=json.dumps(levels),
+    )
+
+    return Response({
+        "message": "Bot created successfully in microservice",
+        "bot_id": bot.id,
+        "levels": levels
+    }, status=200)
+
+def generate_levels(min_price, max_price, pct, capital):
+    current_level = float(max_price)
+    min_p = float(min_price)
+    pct_f = float(pct)
+    data = {"flags": {}, "caps": {}, "buy_price": {}}
+    i = 1
+    total_lv_count = 0
+
+    # Obliczamy ilość poziomów
+    temp_level = current_level
+    while temp_level >= min_p:
+        total_lv_count += 1
+        temp_level = temp_level * (1 - (pct_f / 100.0))
+    
+    # Przechodzimy przez poziomy i przypisujemy dane
+    while current_level >= min_p:
+        lv_name = f"lv{i}"
+        data[lv_name] = round(current_level, 3)
+        data["flags"][f"{lv_name}_bought"] = False
+        data["flags"][f"{lv_name}_sold"] = False
+        data["caps"][lv_name] = round(float(capital) / total_lv_count, 2)  # Podział kapitału
+        data["buy_price"][lv_name] = 0.0
+        i += 1
+        current_level = current_level * (1 - (pct_f / 100.0))
+    return data
+
+
+@api_view(['POST'])
+@authentication_classes([CustomAuthentication])
+@permission_classes([IsAuthenticated])
+def remove_bot(request, bot_id):
+    """
+    Usuwa MicroserviceBot z bazy.
+    (Bez zwalniania salda – to robisz w głównym projekcie, o ile chcesz.)
+    """
+    try:
+        bot = MicroserviceBot.objects.get(id=bot_id)
+    except MicroserviceBot.DoesNotExist:
+        return Response({"error": "Bot not found"}, status=404)
+
+    bot.delete()
+
+    return Response({
+        "message": f"Bot {bot_id} removed."
+    }, status=200)
+
+@api_view(['GET'])
+def debug_bot_status(request, bot_id):
+    """
+    Przykładowy widok zwracający informacje o bocie
+    """
+    try:
+        bot = MicroserviceBot.objects.get(id=bot_id)
+    except MicroserviceBot.DoesNotExist:
+        return Response({"error": "Bot not found"}, status=404)
+
+    return Response({
+        "bot_id": bot.id,
+        "status": bot.status,
+        "instrument": bot.instrument,
+        # ewentualnie cokolwiek innego
+    }, status=200)
+
+
+###########
+#aktualizacja session id po zmianie 
+@api_view(['POST'])
+@authentication_classes([CustomAuthentication])
+@permission_classes([IsAuthenticated])
+def sync_session_id(request):
+    user_id = request.data.get('user_id')
+    stream_session_id = request.data.get('stream_session_id')
+    
+    if not user_id or not stream_session_id:
+        return Response({"error": "Missing user_id or stream_session_id"}, status=400)
+    
+    try:
+        bot = MicroserviceBot.objects.get(user_id=user_id)
+        if bot.stream_session_id != stream_session_id:
+            bot.stream_session_id = stream_session_id
+            bot.save()
+            return Response({"message": "Session ID updated successfully"})
+        return Response({"message": "Session ID already up-to-date"})
+    except MicroserviceBot.DoesNotExist:
+        return Response({"error": "Bot configuration not found for the user"}, status=404)
+
+
+
+######################### POBIERANIE DANYCH BOTA
+@api_view(['GET'])
+@authentication_classes([CustomAuthentication])
+@permission_classes([IsAuthenticated])
+def get_bot_details(request, bot_id):
+    try:
+        bot = MicroserviceBot.objects.get(id=bot_id, user_id=request.user.id)
+    except MicroserviceBot.DoesNotExist:
+        return Response({"error": "Bot not found"}, status=404)
+    
+    try:
+        levels_data = json.loads(bot.levels_data)
+    except (json.JSONDecodeError, TypeError):
+        levels_data = {}
+    
+    levels = {}
+    total_profit = 0
+    lv_keys = [k for k in levels_data.keys() if k.startswith("lv")]
+    number_of_levels = len(lv_keys)
+
+    if number_of_levels == 0:
+        return Response({
+            "error": "No levels found for this bot.",
+            "flags": levels_data.get("flags", {}),
+            "levels": levels,
+            "capital": float(bot.capital),
+            "percent": bot.percent,
+            "total_profit": total_profit,
+        }, status=400)
+    
+    for key in lv_keys:
+        lv_number = key  # np. 'lv1'
+        try:
+            price = float(levels_data.get(key, 0.0))
+        except (ValueError, TypeError):
+            price = 0.0
+        
+        flags = levels_data.get("flags", {})
+        bought = flags.get(f"{lv_number}_bought", False)
+        sold = flags.get(f"{lv_number}_sold", False)
+        
+        try:
+            tp = bot.get_tp_count(lv_number)
+        except Exception as e:
+            tp = 0
+            print(f"Error in get_tp_count for bot_id={bot_id}, lv_number={lv_number}: {e}")
+        
+        try:
+            profit = float(bot.get_profit(lv_number))
+        except Exception as e:
+            profit = 0.0
+            print(f"Error in get_profit for bot_id={bot_id}, lv_number={lv_number}: {e}")
+        
+        capital = float(levels_data.get("caps", {}).get(lv_number, 0.0))  # Poprawne odwołanie do `caps`
+        
+        levels[lv_number] = {
+            "price": price,
+            "capital": capital,
+            "tp": tp,
+            "profit": profit,
+            "bought": bought,
+            "sold": sold
+        }
+        total_profit += profit
+
+    return Response({
+        "flags": levels_data.get("flags", {}),
+        "levels": levels,
+        "capital": float(bot.capital),
+        "percent": bot.percent,
+        "total_profit": total_profit,
+    })

@@ -1,0 +1,596 @@
+from django.shortcuts import render, redirect
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth import login
+from django.contrib import messages 
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+from .forms import CustomUserCreationForm
+from .models import XTBConnection
+from .forms import XTBConnectionForm
+
+
+
+# Create your views here.
+
+def home(request):
+    return render(request, 'home.html')
+
+def login_view(request):
+    return render(request, 'login.html')  
+
+def success_view(request):
+    return render(request, 'success.html')
+
+def profile_view(request):
+    return render(request, 'profile.html')
+
+def history_view(request):
+    # Przygotuj dane historii (lub wstaw model danych)
+    history = [
+        {'date': '2024-12-20', 'name': 'Sample User', 'type': 'Premium', 'amount': 2000},
+        # Dodaj więcej rekordów
+    ]
+    return render(request, 'history.html', {'history': history})
+
+def home_view(request):
+    return render(request, 'home.html')
+
+
+def register_view(request):
+    if request.method == 'POST':
+        form = CustomUserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            messages.success(request, 'Możesz się już zalogować!')
+            return redirect('login')
+        else:
+            messages.error(request, 'Spróbuj jeszcze raz!')
+    else:
+        form = CustomUserCreationForm()
+    return render(request, 'register.html', {'form': form})
+
+
+@login_required
+def dashboard_view(request):
+    # Pobierz połączenie XTB dla aktualnie zalogowanego użytkownika
+    xtb_connection = XTBConnection.objects.filter(user=request.user).first()
+    is_live = xtb_connection.is_live if xtb_connection else False
+
+    return render(request, 'dashboard.html', {'is_live': is_live})
+
+def forgot_password_view(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        new_password = request.POST.get('new_password')
+
+        try:
+            # Weryfikacja użytkownika po username i email
+            user = User.objects.get(username=username, email=email)
+            user.set_password(new_password)  # Ustawienie nowego hasła
+            user.save()
+            messages.success(request, 'Password successfully changed! Now log in.')
+            return redirect('success')  # Przekierowanie na success.html
+        except User.DoesNotExist:
+            messages.error(request, 'No user found with that username and email.')
+
+    return render(request, 'forgot.html')
+
+@login_required
+def profile_view(request):
+    user = request.user
+    xtb_connection = getattr(user, 'xtb_connection', None)
+    
+    if request.method == "POST":
+        form = XTBConnectionForm(request.POST, instance=xtb_connection)
+        if form.is_valid():
+            connection = form.save(commit=False)
+            connection.user = user
+            connection.set_password(form.cleaned_data['password'])
+            connection.save()
+            connection.connect_to_xtb()
+            return redirect('profile')
+    else:
+        form = XTBConnectionForm(instance=xtb_connection)
+
+    return render(request, 'profile.html', {'form': form, 'is_live': xtb_connection.is_live if xtb_connection else False})
+from django.urls import path
+from django.contrib.auth import views as auth_views
+from . import views
+from django.contrib.auth.views import LogoutView
+
+
+urlpatterns = [
+    path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
+    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    path('register/', views.register_view, name='register'),
+    path('dashboard/', views.dashboard_view, name='dashboard'),
+    path('forgot/', views.forgot_password_view, name='forgot'),
+    path('success/', views.success_view, name='success'),
+    path('profile/', views.profile_view, name='profile'),
+    path('history/', views.history_view, name='history'), 
+    path('logout/', LogoutView.as_view(next_page='home'), name='logout'),
+    path('', views.home, name='home'),
+]
+from django.db import models
+
+# Create your models here.
+from django.db import models
+from django.contrib.auth.models import User
+import websocket
+import json
+from cryptography.fernet import Fernet
+
+# Key for encryption/decryption. Store it securely in environment variables or settings.
+FERNET_KEY = 'GiLFpoI4-TzsPAheWRYytzPXuOlZVHOz5FrZsjHYZSk='  # Replace with a generated key
+fernet = Fernet(FERNET_KEY)
+
+class XTBApiConnector:
+    def __init__(self, xtb_id, password):
+        self.xtb_id = xtb_id
+        self.password = password
+        self.ws = None
+        self.stream_session_id = None
+
+    def connect(self):
+        try:
+            self.ws = websocket.create_connection("wss://ws.xtb.com/demo")
+            login_request = {
+                "command": "login",
+                "arguments": {
+                    "userId": self.xtb_id,
+                    "password": self.password
+                }
+            }
+            self.ws.send(json.dumps(login_request))
+            response = json.loads(self.ws.recv())
+            if response.get("status") is True and "streamSessionId" in response:
+                self.stream_session_id = response["streamSessionId"]
+                return True
+            return False
+        except Exception as e:
+            print(f"Connection error: {e}")
+            return False
+
+    def send_command(self, command, arguments=None):
+        if not self.ws:
+            raise ConnectionError("Not connected to XTB API.")
+        try:
+            request = {
+                "command": command,
+                "arguments": arguments or {}
+            }
+            self.ws.send(json.dumps(request))
+            response = json.loads(self.ws.recv())
+            return response
+        except Exception as e:
+            print(f"Command error: {e}")
+            return None
+
+    def disconnect(self):
+        if self.ws:
+            self.ws.close()
+            self.ws = None
+
+class XTBConnection(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='xtb_connection')
+    xtb_id = models.CharField(max_length=50, verbose_name="XTB ID")
+    password = models.BinaryField(verbose_name="Encrypted Password")
+    is_live = models.BooleanField(default=False, verbose_name="Live Status")
+
+    def __str__(self):
+        return f"{self.user.username} - {'LIVE' if self.is_live else 'NOT LIVE'}"
+
+    def set_password(self, raw_password):
+        self.password = fernet.encrypt(raw_password.encode('utf-8'))
+
+    def get_password(self):
+        return fernet.decrypt(self.password).decode('utf-8')
+
+    def connect_to_xtb(self):
+        connector = XTBApiConnector(self.xtb_id, self.get_password())
+        self.is_live = connector.connect()
+        self.save()
+        return connector
+from django import forms
+from django.contrib.auth.models import User
+from django.contrib.auth.forms import UserCreationForm
+
+
+
+class CustomUserCreationForm(UserCreationForm):
+    email = forms.EmailField(required=True, label="Email")
+
+    class Meta:
+        model = User
+        fields = ["username", "email", "password1", "password2"]
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.email = self.cleaned_data['email']
+        if commit:
+            user.save()
+        return user
+
+from .models import XTBConnection
+
+class XTBConnectionForm(forms.ModelForm):
+    # Ręcznie definiujemy pole dla hasła jako tekstowe (PasswordInput)
+    password = forms.CharField(widget=forms.PasswordInput, label="Password")
+
+    class Meta:
+        model = XTBConnection
+        fields = ['xtb_id']  # Pomijamy 'password', bo obsługujemy je ręcznie
+
+    def save(self, commit=True):
+        # Przechwycenie zapisu, aby obsłużyć szyfrowanie hasła
+        instance = super().save(commit=False)
+        instance.set_password(self.cleaned_data['password'])  # Hashowanie hasła
+        if commit:
+            instance.save()
+        return instance 
+from django.apps import AppConfig
+
+
+class HomeConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'home'
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Dashboard | STOCKstorm</title>
+  <link rel="stylesheet" href="{% static 'css/dashboard.css' %}" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="logo">
+      <a href="#">STOCKstorm</a>
+      <div class="search_box">
+        <input type="text" placeholder="Search EasyPay">
+        <i class="fa-sharp fa-solid fa-magnifying-glass"></i>
+      </div>
+    </div>
+
+    <div class="header-icons">
+        <div class="status">
+            {% if is_live %}
+            <i class="fas fa-circle" style="color: green;"></i> LIVE
+            {% else %}
+            <i class="fas fa-circle" style="color: red;"></i> NOT LIVE
+            {% endif %}
+        </div>
+        <form action="{% url 'logout' %}" method="POST" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" title="Logout" style="background: none; border: none; cursor: pointer;">
+                <i class="fas fa-sign-out-alt logout-icon"></i>
+            </button>
+        </form>
+        <i class="fas fa-bell"></i>
+        <div class="account">
+            <img src="{% static 'images/ava.jpg' %}" alt="Profile Image">
+            <h4>{{ user.username }}</h4>
+        </div>
+    </div>
+  </header>
+    
+  </header>
+
+  <div class="container">
+    <nav>
+      <div class="side_navbar">
+        <span>Main Menu</span>
+        <a href="{% url 'dashboard' %}" class="active">Dashboard</a>
+        <a href="{% url 'profile' %}">Profile</a>
+        <a href="{% url 'history' %}">History</a>
+        <div class="links">
+          <span>Quick Links</span>
+          <a href="#">Paypal</a>
+          <a href="#">EasyPay</a>
+          <a href="#">SadaPay</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="main-body">
+      <h2>Dashboard</h2>
+      <div class="promo_card">
+        <h1>Welcome to EasyPay</h1>
+        <span>Lorem ipsum dolor sit amet.</span>
+        <button>Learn More</button>
+      </div>
+
+      <div class="history_lists">
+        <div class="list1">
+          <div class="row">
+            <h4>History</h4>
+            <a href="{% url 'history' %}">See all</a>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Dates</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in history %}
+              <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ item.date }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.type }}</td>
+                <td>${{ item.amount }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="list2">
+          <div class="row">
+            <h4>Documents</h4>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Uploaded</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for doc in documents %}
+              <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ doc.title }}</td>
+                <td>{{ doc.type }}</td>
+                <td>{{ doc.uploaded }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <h4>Account Balance</h4>
+
+      {% for balance in balances %}
+      <div class="balance">
+        <i class="fas fa-{{ balance.currency_icon }} icon"></i>
+        <div class="info">
+          <h5>{{ balance.currency }}</h5>
+          <span>{{ balance.symbol }}{{ balance.amount }}</span>
+        </div>
+      </div>
+      {% endfor %}
+
+    </div>
+  </div>
+</body>
+</html>
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
+*{
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  text-decoration: none;
+  box-sizing: border-box;
+  font-family: "Poppins", sans-serif;
+}
+body{
+  background: rgb(219, 219, 219);
+}
+.header{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  padding: 20px;
+  background: #fff;
+}
+.logo{
+  display: flex;
+  align-items: center;
+}
+.logo a{
+  color: #000;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 2rem 8rem 2rem 2rem;
+}
+.search_box{
+  display: flex;
+  align-items: center;
+}
+.search_box input{
+  padding: 9px;
+  width: 250px;
+  background: rgb(228, 228, 228);
+  border-top-left-radius: 5px;
+  border-bottom-left-radius: 5px;
+}
+.search_box i{
+  padding: 0.66rem;
+  cursor: pointer;
+  color: #fff;
+  background: #000;
+  border-top-right-radius: 5px;
+  border-bottom-right-radius: 5px;
+}
+
+.header-icons .status {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: bold;
+    font-size: 12px;
+    margin-right: 30px;
+}
+
+.header-icons .status i {
+    font-size: 12px;
+    margin-right: 2px;
+}
+
+.header-icons{
+  display: flex;
+  align-items: center;
+}
+.header-icons i{
+  margin-right: 2rem;
+  cursor: pointer;
+}
+.header-icons .account{
+  width: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.header-icons  .logout-icon {
+    color: #000;
+    cursor: pointer;
+    transition: color 0.3s ease;
+  }
+.header-icons .account img{
+  width: 35px;
+  height: 35px;
+  cursor: pointer;
+  border-radius: 50%;
+}
+.container{
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Side menubar section */
+nav{
+  background: #fff;
+}
+.side_navbar{
+  padding: 1px;
+  display: flex;
+  flex-direction: column;
+}
+.side_navbar span{
+  color: gray;
+  margin: 1rem 3rem;
+  font-size: 12px;
+}
+.side_navbar a{
+  width: 100%;
+  padding: 0.8rem 3rem;
+  font-weight: 500;
+  font-size: 15px;
+  color: rgb(100, 100, 100);
+}
+.links{
+  margin-top: 5rem;
+  display: flex;
+  flex-direction: column;
+}
+.links a{
+  font-size: 13px;
+}
+.side_navbar a:hover{
+  background: rgb(235, 235, 235);
+}
+.side_navbar .active{
+  border-left: 2px solid rgb(100, 100, 100);
+}
+
+/* Main Body Section */
+.main-body{
+  width: 70%;
+  padding: 1rem;
+}
+.promo_card{
+  width: 100%;
+  color: #fff;
+  margin-top: 10px;
+  border-radius: 8px;
+  padding: 0.5rem 1rem 1rem 3rem;
+  background: rgb(37, 37, 37);
+}
+.promo_card h1, .promo_card span, button{
+  margin: 10px;
+}
+.promo_card button{
+  display: block;
+  padding: 6px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.history_lists{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.row{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 1rem 0;
+}
+table{
+  background: #fff;
+  padding: 1rem;
+  text-align: left;
+  border-radius: 10px;
+}
+table td, th{
+  padding: 0.2rem 0.8rem;
+}
+table th{
+  font-size: 15px;
+}
+table td{
+  font-size: 13px;
+  color: rgb(100, 100, 100);
+}
+
+
+
+/* Sidebar Section */
+.sidebar{
+  width: 15%;
+  padding: 2rem 1rem;
+  background: #fff;
+}
+.sidebar h4{
+  margin-bottom: 1.5rem;
+}
+.sidebar .balance{
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.balance .icon{
+  color: #fff;
+  font-size: 20px;
+  border-radius: 6px;
+  margin-right: 1rem;
+  padding: 1rem;
+  background: rgb(37, 37, 37);
+}
+.balance .info h5{
+  font-size: 16px;
+}
+.balance .info span{
+  font-size: 14px;
+  color: rgb(100, 100, 100);
+}
+.balance .info i{
+  margin-right: 2px;
+}

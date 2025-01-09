@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}
+  Szczegóły Bota | STOCKstorm
+{% endblock %}
+
+{% block content %}
+<div style="margin: 1rem;">
+  <h2>Szczegóły Bota: {{ bot.name }}</h2>
+
+  <div style="background:#fff; padding:1rem; border-radius:8px; margin-bottom:1rem;">
+    <p><strong>Aktywo:</strong> {{ bot.instrument }}</p>
+    <p><strong>Status:</strong> {{ bot.status }}</p>
+    <p><strong>Min Price:</strong> {{ bot.min_price }}</p>
+    <p><strong>Max Price:</strong> {{ bot.max_price }}</p>
+    <p><strong>Procent:</strong> {{ bot.percent }}%</p>
+    <p><strong>Kapitał:</strong> {{ bot.capital }}</p>
+  </div>
+
+  <!-- Sekcja poziomów -->
+  <h3>Poziomy Handlowe</h3>
+  <table id="levels-table" border="1" cellpadding="5" cellspacing="0">
+    <thead>
+      <tr>
+        <th>Level</th>
+        <th>Cena</th>
+        <th>Kapitał</th>
+        <th>Liczba TP</th>
+        <th>Zysk</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for lv, details in bot_details.levels.items %}
+        <tr id="level-{{ lv }}">
+          <td>{{ lv }}</td>
+          <td id="{{ lv }}-price">{{ details.price }}</td>
+          <td id="{{ lv }}-capital">{{ details.capital }}</td>
+          <td id="{{ lv }}-tp">{{ details.tp }}</td>
+          <td id="{{ lv }}-profit">{{ details.profit }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h3>Całkowity Zysk</h3>
+  <p id="total-profit">{{ bot_details.total_profit }}</p>
+
+  <!-- Przycisk zatrzymania bota (o ile bot nie jest już zakończony) -->
+  {% if bot.status != "FINISHED" %}
+  <div style="margin-top: 1rem;">
+    <form action="{% url 'bot_remove' bot.id %}" method="post" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit" style="background:#dc3545; color:#fff; padding:8px 15px; border-radius:5px; cursor:pointer;">
+        Zatrzymaj/Usuń bota
+      </button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+<!-- JavaScript -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+  const apiEndpoint = "{% url 'get_bot_details_proxy' bot.id %}";
+
+  function updateBotDetails() {
+    $.ajax({
+      url: apiEndpoint,
+      method: 'GET',
+      success: function(data) {
+        if (data.error) {
+          console.error(data.error);
+          alert("Nie udało się pobrać danych bota. Spróbuj ponownie później.");
+          return;
+        }
+
+        let totalProfit = 0;
+
+        // Aktualizacja danych dla każdego poziomu
+        for (const [lv, details] of Object.entries(data.levels)) {
+          $(`#${lv}-price`).text(details.price.toFixed(2));
+          $(`#${lv}-capital`).text(details.capital.toFixed(2));
+          $(`#${lv}-tp`).text(details.tp);
+          $(`#${lv}-profit`).text(details.profit.toFixed(2));
+
+          totalProfit += parseFloat(details.profit);
+        }
+
+        // Aktualizacja całkowitego zysku
+        $("#total-profit").text(totalProfit.toFixed(2));
+      },
+      error: function(xhr, status, error) {
+        console.error("Błąd podczas pobierania danych bota:", error);
+        alert("Wystąpił błąd podczas pobierania danych. Spróbuj ponownie później.");
+      }
+    });
+  }
+
+  // Aktualizacja co 5 sekund
+  setInterval(updateBotDetails, 5000);
+  $(document).ready(updateBotDetails);
+</script>
+{% endblock %}
