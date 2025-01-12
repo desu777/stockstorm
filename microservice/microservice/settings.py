@@ -134,12 +134,32 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
+        #'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
 
-MICROSERVICE_API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM1MzA5NzU4LCJpYXQiOjE3MzUzMDk0NTgsImp0aSI6IjJiNjk1MTdlYTM2MzQ5MjE4MThkNzg3ZjNlMjVkMDk5IiwidXNlcl9pZCI6Nn0.Nm0mZBwvWRsZQOtLBJ3XxYT7ZgsdVLZscLvRehuYZJU"
-MICROSERVICE_API_TOKEN2 = "8ee87711af0f17dbec69ec1bfae12ccde2f6f012"
+TOKENS_FILE_PATH = Path.home() / 'Desktop' / 'microservice_tokens.txt'
+
+def load_tokens(filepath):
+    tokens = {}
+    try:
+        with open(filepath, 'r') as file:
+            for line in file:
+                if '=' in line:
+                    key, value = line.strip().split('=', 1)
+                    tokens[key] = value
+    except FileNotFoundError:
+        print(f"[ERROR] Plik {filepath} nie został znaleziony!")
+    except Exception as e:
+        print(f"[ERROR] Błąd podczas odczytu tokenów: {e}")
+    return tokens
+
+# Wczytaj tokeny
+tokens = load_tokens(TOKENS_FILE_PATH)
+
+# Przypisz tokeny do zmiennych Django
+MICROSERVICE_API_TOKEN = tokens.get('MICROSERVICE_API_TOKEN', '')
+MICROSERVICE_API_TOKEN2 = tokens.get('MICROSERVICE_API_TOKEN2', '')

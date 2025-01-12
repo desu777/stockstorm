@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from decimal import Decimal
 import json
 from django.db import transaction
-from .models import MicroserviceBot  # Usuwamy import UserProfile (niepotrzebny)
+from .models import MicroserviceBot
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -19,14 +19,112 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from .models import UserProfile
 from rest_framework.exceptions import AuthenticationFailed
+from django.contrib.auth.models import AnonymousUser
+from rest_framework.exceptions import AuthenticationFailed
+from django.contrib.auth.models import User
+from rest_framework.authentication import BaseAuthentication, get_authorization_header
+from rest_framework.exceptions import AuthenticationFailed
+from django.contrib.auth.models import AnonymousUser
 
-class CustomAuthentication(TokenAuthentication):
-    def authenticate_credentials(self, key):
+
+from rest_framework.authentication import BaseAuthentication, get_authorization_header
+from rest_framework.exceptions import AuthenticationFailed
+from django.contrib.auth.models import User
+
+class CustomAuthentication(BaseAuthentication):
+    """
+    Ręcznie parsuje nagłówek:
+        Authorization: Token <token_z_UserProfile>
+    Tworzy 'tymczasowego' użytkownika typu django.contrib.auth.models.User.
+    """
+
+    keyword = b"token"  # Oczekujemy "Token <xxx>" (bez względu na wielkość liter)
+
+    def authenticate(self, request):
+        # Pobranie nagłówka Authorization
+        auth = get_authorization_header(request).split()
+        print(f"[AUTH] Otrzymany nagłówek Authorization: {auth}")
+
+        # Sprawdzenie obecności nagłówka
+        if not auth:
+            print("[AUTH] Brak nagłówka Authorization.")
+            return None  # brak nagłówka => brak autentykacji
+
+        # Sprawdzenie prefixu "Token"
+        if auth[0].lower() != self.keyword:
+            print(f"[AUTH] Niepoprawny prefix. Oczekiwano: {self.keyword}, Otrzymano: {auth[0]}")
+            return None  # prefix nie to "Token" => pomijamy
+
+        # Sprawdzenie poprawności długości nagłówka
+        if len(auth) == 1:
+            print("[AUTH] Nie podano tokena. Nagłówek zawiera tylko prefix.")
+            raise AuthenticationFailed("Invalid token header. No credentials provided.")
+        elif len(auth) > 2:
+            print("[AUTH] Token zawiera spacje. Nieprawidłowy format.")
+            raise AuthenticationFailed("Invalid token header. Token string should not contain spaces.")
+
         try:
+            token_key = auth[1].decode()
+            print(f"[AUTH] Otrzymany token: {token_key}")
+        except UnicodeError:
+            print("[AUTH] Token zawiera niedozwolone znaki (nie ASCII).")
+            raise AuthenticationFailed("Invalid token header. Token must be ASCII.")
+
+        return self.authenticate_credentials(token_key)
+
+    def authenticate_credentials(self, key):
+        from .models import UserProfile  # Import lokalny, aby uniknąć błędów cyklicznych
+
+        print(f"[AUTH] Sprawdzanie tokena w bazie danych: {key}")
+        
+        try:
+            # Szukamy tokenu w UserProfile
             user_profile = UserProfile.objects.get(auth_token=key)
-            return (user_profile.user, key)
+            print(f"[AUTH] Znaleziono użytkownika z user_id={user_profile.user_id}")
         except UserProfile.DoesNotExist:
-            raise AuthenticationFailed('Invalid token')
+            print("[AUTH] Nie znaleziono użytkownika z podanym tokenem.")
+            raise AuthenticationFailed("Invalid token")
+
+        # Tworzymy tymczasowy obiekt User z biblioteki Django
+        user_mock = User(
+            id=user_profile.user_id,
+            username=f"micro_{user_profile.user_id}",
+            is_active=True,
+            is_staff=True,
+            is_superuser=True
+        )
+        user_mock.set_unusable_password()
+
+        print(f"[AUTH] Tymczasowy użytkownik: {user_mock.username}, ID: {user_mock.id}")
+
+        return (user_mock, None)
+
+class MicroserviceUser(AnonymousUser):
+    """
+    Dziedziczymy po AnonymousUser, ale nadpisujemy property
+    tak, by faktycznie był traktowany przez DRF jako zalogowany.
+    """
+
+    def __init__(self, user_id):
+        super().__init__()
+        self.pk = user_id
+        self.id = user_id
+        # Dodatkowo ustawiamy flags – w niektórych przypadkach DRF
+        # może sprawdzać is_active, is_staff itp.
+        self.is_active = True
+        self.is_staff = True
+        self.is_superuser = True
+
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_anonymous(self):
+        return False
+
+
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -76,7 +174,6 @@ def register(request):
 
 @api_view(['POST'])
 @authentication_classes([CustomAuthentication])
-@permission_classes([IsAuthenticated])
 def create_bot(request):
     """
     Tworzy bota w mikroserwisie – brak rezerwacji salda!

@@ -41,5 +41,5 @@ This project implements a Django-based **microservice** designed for managing an
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/yourusername/microservice-bot.git
+git clone https://github.com/desu777/stockstorm
 cd microservice-bot

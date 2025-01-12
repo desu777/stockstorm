@@ -1,6 +1,0 @@
-django
-mysqlclient //pymysql
-websocket-client
-cryptography
-djangorestframework djangorestframework-simplejwt
-celery
