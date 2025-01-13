@@ -1,4 +1,4 @@
-#apps.py
+# apps.py
 import sys
 from django.apps import AppConfig
 
@@ -10,5 +10,5 @@ class ApiConfig(AppConfig):
         if 'makemigrations' in sys.argv or 'migrate' in sys.argv:
             return
 
-        from .bot_logic import start_bots_worker  # <-- poprawna nazwa
+        from .bot_logic import start_bots_worker
         start_bots_worker()

@@ -3,6 +3,7 @@ from django.db import models
 # Create your models here.
 from django.db import models
 import json
+from cryptography.fernet import Fernet
 
 class UserProfile(models.Model):
     user_id = models.IntegerField(unique=True)
@@ -12,6 +13,8 @@ class UserProfile(models.Model):
     def __str__(self):
         return f"UserProfile(user_id={self.user_id}, balance={self.balance}, reserved={self.reserved_balance})"
 
+FERNET_KEY = "GiLFpoI4-TzsPAheWRYytzPXuOlZVHOz5FrZsjHYZSk="  # przykładowy klucz
+fernet = Fernet(FERNET_KEY)
 
 
 class MicroserviceBot(models.Model):
@@ -29,17 +32,33 @@ class MicroserviceBot(models.Model):
     max_price = models.DecimalField(max_digits=10, decimal_places=2)
     percent = models.IntegerField()
     capital = models.DecimalField(max_digits=12, decimal_places=2)
-    stream_session_id = models.CharField(max_length=100, blank=True, null=True)
+   
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='NEW')
     created_at = models.DateTimeField(auto_now_add=True)
 
     # Pola do logiki poziomów (JSON)
     levels_data = models.TextField(blank=True, null=True)  
     # np. { "lv1": 10.0, "lv2": 9.0, "lv3": 8.1, "flags": {...}, ... }
-
+    xtb_login = models.CharField(max_length=50, blank=True, null=True)
+    xtb_password_enc = models.BinaryField(blank=True, null=True)
     def __str__(self):
         return f"MicroserviceBot {self.name} (user={self.user_id}, {self.instrument}, {self.status})"
 
+
+    def set_xtb_password(self, plain_password: str):
+        """
+        Zaszyfrowanie hasła i zapis w polu xtb_password_enc
+        """
+        enc = fernet.encrypt(plain_password.encode('utf-8'))
+        self.xtb_password_enc = enc
+
+    def get_xtb_password(self):
+        """
+        Odszyfrowanie hasła z xtb_password_enc
+        """
+        if not self.xtb_password_enc:
+            return None
+        return fernet.decrypt(self.xtb_password_enc).decode('utf-8')
 
     def get_tp_count(self, lv_number):
         """

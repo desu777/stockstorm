@@ -176,7 +176,7 @@ def register(request):
 @authentication_classes([CustomAuthentication])
 def create_bot(request):
     """
-    Tworzy bota w mikroserwisie – brak rezerwacji salda!
+    Tworzy bota w mikroserwisie, zapisuje xtb_login i zaszyfrowane hasło.
     """
     user_id = request.data.get('user_id')
     name = request.data.get('name')
@@ -185,9 +185,11 @@ def create_bot(request):
     max_price = request.data.get('max_price')
     percent = request.data.get('percent')
     capital = request.data.get('capital')
-    stream_session_id = request.data.get('stream_session_id', '')
 
-    # Walidacja danych wejściowych
+    # Nowe
+    xtb_id = request.data.get('xtb_id')
+    xtb_password = request.data.get('xtb_password')
+
     if not user_id or not instrument or not min_price or not max_price:
         return Response({"error": "Missing required fields"}, status=400)
 
@@ -199,8 +201,7 @@ def create_bot(request):
     # Generujemy "levels_data"
     levels = generate_levels(min_price, max_price, percent, capital)
 
-    # Tworzenie bota w bazie
-    # (Bez żadnego rezerwowania salda)
+    # Tworzenie bota
     bot = MicroserviceBot.objects.create(
         user_id=user_id,
         name=name,
@@ -209,11 +210,13 @@ def create_bot(request):
         max_price=max_price,
         percent=percent,
         capital=capital,
-        stream_session_id=stream_session_id,
         status='RUNNING',
-        # ewentualnie zapisz levels_data w polu
         levels_data=json.dumps(levels),
+        xtb_login=xtb_id,
     )
+    if xtb_password:
+        bot.set_xtb_password(xtb_password)
+        bot.save()
 
     return Response({
         "message": "Bot created successfully in microservice",
@@ -229,24 +232,22 @@ def generate_levels(min_price, max_price, pct, capital):
     i = 1
     total_lv_count = 0
 
-    # Obliczamy ilość poziomów
     temp_level = current_level
     while temp_level >= min_p:
         total_lv_count += 1
-        temp_level = temp_level * (1 - (pct_f / 100.0))
-    
-    # Przechodzimy przez poziomy i przypisujemy dane
+        temp_level *= (1 - pct_f / 100.0)
+
     while current_level >= min_p:
         lv_name = f"lv{i}"
         data[lv_name] = round(current_level, 3)
         data["flags"][f"{lv_name}_bought"] = False
         data["flags"][f"{lv_name}_sold"] = False
-        data["caps"][lv_name] = round(float(capital) / total_lv_count, 2)  # Podział kapitału
+        data["caps"][lv_name] = round(float(capital) / total_lv_count, 2)
         data["buy_price"][lv_name] = 0.0
         i += 1
-        current_level = current_level * (1 - (pct_f / 100.0))
-    return data
+        current_level *= (1 - pct_f / 100.0)
 
+    return data
 
 @api_view(['POST'])
 @authentication_classes([CustomAuthentication])
