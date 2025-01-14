@@ -175,9 +175,6 @@ def register(request):
 @api_view(['POST'])
 @authentication_classes([CustomAuthentication])
 def create_bot(request):
-    """
-    Tworzy bota w mikroserwisie, zapisuje xtb_login i zaszyfrowane hasło.
-    """
     user_id = request.data.get('user_id')
     name = request.data.get('name')
     instrument = request.data.get('instrument')
@@ -185,23 +182,14 @@ def create_bot(request):
     max_price = request.data.get('max_price')
     percent = request.data.get('percent')
     capital = request.data.get('capital')
+    account_currency = request.data.get('account_currency')
+    asset_currency = request.data.get('asset_currency')
 
-    # Nowe
     xtb_id = request.data.get('xtb_id')
     xtb_password = request.data.get('xtb_password')
 
-    if not user_id or not instrument or not min_price or not max_price:
-        return Response({"error": "Missing required fields"}, status=400)
-
-    min_price = Decimal(min_price)
-    max_price = Decimal(max_price)
-    capital = Decimal(capital) if capital else Decimal("0")
-    percent = int(percent)
-
-    # Generujemy "levels_data"
     levels = generate_levels(min_price, max_price, percent, capital)
 
-    # Tworzenie bota
     bot = MicroserviceBot.objects.create(
         user_id=user_id,
         name=name,
@@ -210,6 +198,8 @@ def create_bot(request):
         max_price=max_price,
         percent=percent,
         capital=capital,
+        account_currency=account_currency,
+        asset_currency=asset_currency,
         status='RUNNING',
         levels_data=json.dumps(levels),
         xtb_login=xtb_id,
@@ -224,11 +214,12 @@ def create_bot(request):
         "levels": levels
     }, status=200)
 
+
 def generate_levels(min_price, max_price, pct, capital):
     current_level = float(max_price)
     min_p = float(min_price)
     pct_f = float(pct)
-    data = {"flags": {}, "caps": {}, "buy_price": {}}
+    data = {"flags": {}, "caps": {}, "buy_price": {}, "buy_volume": {}}  # Dodajemy buy_volume
     i = 1
     total_lv_count = 0
 
@@ -244,10 +235,12 @@ def generate_levels(min_price, max_price, pct, capital):
         data["flags"][f"{lv_name}_sold"] = False
         data["caps"][lv_name] = round(float(capital) / total_lv_count, 2)
         data["buy_price"][lv_name] = 0.0
+        data["buy_volume"][lv_name] = 0.0  # Dodajemy wolumen kupna
         i += 1
         current_level *= (1 - pct_f / 100.0)
 
     return data
+
 
 @api_view(['POST'])
 @authentication_classes([CustomAuthentication])

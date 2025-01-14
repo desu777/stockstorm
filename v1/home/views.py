@@ -261,6 +261,9 @@ def search_instruments(request):
 
     return JsonResponse(matches[:10], safe=False)
 
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+
 @login_required
 def show_symbols_view(request):
     manager = XTBConnectionManager()
@@ -278,12 +281,15 @@ def show_symbols_view(request):
         all_symbols = response.get("returnData", [])
         for sym_info in all_symbols:
             selected_data.append({
-                "symbol": sym_info.get('symbol'),
-                "currency": sym_info.get('currency'),
-                "categoryName": sym_info.get('categoryName')
+                "symbol": sym_info.get('symbol'),             # Symbol (np. PKN.PL_4)
+                "currency": sym_info.get('currency'),         # Waluta (np. PLN)
+                "categoryName": sym_info.get('categoryName'), # Typ (np. STOCKS, CFD)
+                "description": sym_info.get('description'),   # Opis (np. PKN Orlen)
+                "leverage": sym_info.get('leverage'),         # Dźwignia (np. 1, 4, 9)
             })
 
     return JsonResponse(selected_data, safe=False)
+
 
 def get_stock_market_status():
     now = datetime.now(timezone.utc)
@@ -411,11 +417,12 @@ def bot_add(request):
         percent = request.POST.get('percent')
         capital = request.POST.get('capital')
         
-        # Nowe pola
+        account_currency = request.POST.get('account_currency')
+        asset_currency = request.POST.get('asset_currency')
+
         xtb_id = request.POST.get('xtb_id')
         xtb_password = request.POST.get('xtb_password')
 
-        # 1) Zapisz bota w bazie danych
         new_bot = Bot.objects.create(
             user=request.user,
             name=name,
@@ -426,16 +433,14 @@ def bot_add(request):
             capital=capital,
             status='NEW'
         )
-        
-        # 2) Pobierz token mikroserwisu zamiast używać ustawień
+
         microservice_token = get_token(request.user.id)
         if not microservice_token:
             new_bot.status = 'ERROR'
             new_bot.save()
             messages.error(request, 'Brak tokena mikroserwisu. Nie udało się utworzyć bota.')
             return redirect('bot_list')
-        
-        # 3) Wyślij dane do mikroserwisu
+
         headers = {'Authorization': f'Token {microservice_token}'}
         payload = {
             'user_id': request.user.id,
@@ -445,22 +450,16 @@ def bot_add(request):
             'max_price': max_price,
             'percent': percent,
             'capital': capital,
-
-            # Dane do logowania w XTB (mikroserwis sam się zaloguje)
+            'account_currency': account_currency,
+            'asset_currency': asset_currency,
             'xtb_id': xtb_id,
             'xtb_password': xtb_password,
         }
 
         try:
-            resp = requests.post(
-                f"{settings.MICROSERVICE_URL2}/create_bot/", 
-                json=payload, 
-                headers=headers, 
-                timeout=5
-            )
+            resp = requests.post(f"{settings.MICROSERVICE_URL2}/create_bot/", json=payload, headers=headers, timeout=5)
             if resp.status_code == 200:
                 data = resp.json()
-                # Odbieramy ID bota w mikroserwisie
                 new_bot.microservice_bot_id = data.get("bot_id")
                 new_bot.status = 'RUNNING'
                 new_bot.save()
@@ -476,8 +475,8 @@ def bot_add(request):
 
         return redirect('bot_list')
 
-    # GET -> renderujemy formularz
     return render(request, 'bot_add.html')
+
 
 @login_required
 def bot_remove(request, bot_id):

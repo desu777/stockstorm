@@ -28,129 +28,142 @@ def get_current_price(symbol: str):
 
 
 async def monitor_price(bot_id: int, symbol: str, interval: float = 0.5):
-    """
-    Monitoruje cenę instrumentu co `interval` sekund i aktualizuje dane tylko, gdy cena się zmienia.
-    """
     last_price = None
-
     while True:
-        current_price = get_current_price(symbol)
-        if current_price is not None:
-            # Sprawdzamy, czy cena się zmieniła
-            if current_price != last_price:
-                bot = await sync_to_async(MicroserviceBot.objects.get)(pk=bot_id)
-                await _apply_levels_logic(bot, current_price)
-                last_price = current_price  # Aktualizujemy ostatnią zapisaną cenę
-                print(f"[{_timestamp()}] [Bot {bot_id}] Updated price: {current_price}")
-            else:
-                print(f"[{_timestamp()}] [Bot {bot_id}] Price unchanged: {current_price}")
-        else:
-            print(f"[{_timestamp()}] [Bot {bot_id}] Brak aktualnej ceny dla {symbol}")
+        try:
+            current_price = get_current_price(symbol)
+            if current_price is not None:
+                if current_price != last_price:
+                    bot = await sync_to_async(MicroserviceBot.objects.get)(pk=bot_id)
+                    await _apply_levels_logic(bot, current_price)
+                    last_price = current_price
+                    print(f"[{_timestamp()}] [Bot {bot_id}] Updated price: {current_price}")
+                else:
+                    print(f"[{_timestamp()}] [Bot {bot_id}] Price unchanged: {current_price}")
 
-        await asyncio.sleep(interval)  # Sprawdzaj co 0.5 sekundy
+        except Exception as e:
+            print(f"[ERROR] [Bot {bot_id}] Error in monitoring price: {e}")
+            await asyncio.sleep(5)  # Opóźnienie przed kolejną próbą
 
+        await asyncio.sleep(interval)
+
+
+import asyncio
 
 async def _apply_levels_logic(bot: MicroserviceBot, current_price: float):
-    """
-    Sprawdza, czy trzeba kupić/sprzedać według 'levels_data'.
-    Jeśli tak, wywołuje trade_bot(...) w xtb_manager.
-    """
-    if not bot.levels_data:
-        return
+    try:
+        if not bot.levels_data:
+            return
 
-    data = json.loads(bot.levels_data)
-    flags = data.get("flags", {})
-    caps = data.get("caps", {})
-    buy_price = data.get("buy_price", {})
+        data = json.loads(bot.levels_data)
+        flags = data.get("flags", {})
+        caps = data.get("caps", {})
+        buy_price = data.get("buy_price", {})
+        buy_volume = data.get("buy_volume", {})
 
-    levels_keys = [k for k in data.keys() if k.startswith('lv')]
-    levels_keys.sort(key=lambda x: int(x[2:]))
+        usdpln_rate = instrument_prices.get((bot.id, "USDPLN"), {}).get("bid", 1)
 
-    if not levels_keys:
-        return
+        # 📉 SPRAWDZENIE PRZEKROCZENIA LV1
+        lv1_price = data.get("lv1", 0)
+        if current_price > lv1_price:
+            print(f"[{_timestamp()}] [Bot {bot.id}] Cena przekroczyła poziom lv1. Bot zakończy działanie po zamknięciu pozycji.")
 
-    target_profit_percent = float(bot.percent)
+            # 🛑 SPRZEDAŻ WSZYSTKICH OTWARTYCH POZYCJI
+            for lv in sorted([k for k in data.keys() if k.startswith('lv')], key=lambda x: int(x[2:])):
+                bf, sf = f"{lv}_bought", f"{lv}_sold"
 
-    for lv in levels_keys:
-        price_lv = data[lv]
-        bf = f"{lv}_bought"
-        sf = f"{lv}_sold"
+                # Jeśli pozycja kupiona i jeszcze nie sprzedana
+                if flags.get(bf) and not flags.get(sf):
+                    volume = buy_volume.get(lv, 0.0)
+                    if volume > 0:
+                        response = await xtb_manager.trade_bot(bot.id, bot.instrument, volume, cmd=1)  # SELL
+                        if response.get('status'):
+                            flags[sf] = True  # Aktualizacja flagi sprzedanej pozycji
+                            print(f"[SELL] Bot {bot.id}: Sprzedał otwartą pozycję na {lv}, wolumen {volume}")
+                        else:
+                            print(f"[ERROR] Bot {bot.id}: Nie udało się sprzedać {lv}, wolumen {volume}")
 
-        if lv not in caps:
-            caps[lv] = 0
-        if lv not in buy_price:
-            buy_price[lv] = 0
+            # 🔒 ZAKOŃCZENIE DZIAŁANIA BOTA
+            bot.status = 'FINISHED'
+            bot.levels_data = json.dumps(data)
+            await sync_to_async(bot.save)()
+            print(f"[{_timestamp()}] [Bot {bot.id}] Wszystkie pozycje zamknięte. Status zmieniony na FINISHED.")
+            return  # Przerwanie działania bota po sprzedaży wszystkiego
 
-        # ###### KUPNO ######
-        if current_price <= price_lv and not flags.get(bf):
-            if caps[lv] == 0:
-                total_lv_count = len(levels_keys)
-                portion = float(bot.capital) / total_lv_count
-                caps[lv] = round(portion, 2)
+        # 📈 STANDARDOWA LOGIKA HANDLU
+        for lv in sorted([k for k in data.keys() if k.startswith('lv')], key=lambda x: int(x[2:])):
+            price_lv = data[lv]
+            bf, sf = f"{lv}_bought", f"{lv}_sold"
+            in_progress = f"{lv}_in_progress"
 
-            buy_vol = round(caps[lv] / current_price, 3)
-            # Kupno w XTB
-            await xtb_manager.trade_bot(
-                bot_id=bot.id,
-                symbol=bot.instrument,
-                price=current_price,
-                volume=buy_vol,
-                cmd=0  # BUY
-            )
-            buy_price[lv] = current_price
-            flags[bf] = True
-            print(f"[{_timestamp()}] [Bot {bot.id}] BUY at {lv} price={current_price} vol={buy_vol}")
+            lower_bound = price_lv * 0.995
+            upper_bound = price_lv * 1.005
 
-        # ###### SPRZEDAŻ ######
-        if flags.get(bf) and not flags.get(sf) and buy_price[lv] > 0:
-            growth_percent = ((current_price - buy_price[lv]) / buy_price[lv]) * 100.0
-            if growth_percent >= target_profit_percent:
-                profit = caps[lv] * (growth_percent / 100.0)
-                caps[lv] += round(profit, 2)  # reinwestycja
+            # KUPNO z blokadą
+            if not flags.get(bf) and not flags.get(in_progress) and lower_bound <= current_price <= upper_bound:
+                flags[in_progress] = True
+                portion = caps[lv]
+                adjusted_portion = portion / usdpln_rate if bot.account_currency != bot.asset_currency else portion
+                volume = round(adjusted_portion / current_price, 3)
 
-                sell_vol = round(caps[lv] / current_price, 3)
-                await xtb_manager.trade_bot(
-                    bot_id=bot.id,
-                    symbol=bot.instrument,
-                    price=current_price,
-                    volume=sell_vol,
-                    cmd=1  # SELL
-                )
-                flags[sf] = True
-                print(
-                    f"[{_timestamp()}] [Bot {bot.id}] SELL at {lv} price={current_price}, "
-                    f"growth={growth_percent:.2f}%, profit={profit:.2f}, caps={caps[lv]:.2f}"
-                )
+                response = await xtb_manager.trade_bot(bot.id, bot.instrument, volume, cmd=0)  # BUY
+                if response.get('status'):
+                    buy_price[lv] = current_price
+                    buy_volume[lv] = volume
+                    flags[bf] = True
+                    print(f"[BUY] Bot {bot.id}: Kupił na {lv} za {current_price}, wolumen {volume}")
+                flags[in_progress] = False
 
-    data["flags"] = flags
-    data["caps"] = caps
-    data["buy_price"] = buy_price
+            # SPRZEDAŻ z reinwestycją
+            if flags.get(bf) and not flags.get(sf) and buy_price[lv] > 0:
+                growth_percent = ((current_price - buy_price[lv]) / buy_price[lv]) * 100.0
+                if growth_percent >= float(bot.percent):
+                    volume = buy_volume[lv]
+                    response = await xtb_manager.trade_bot(bot.id, bot.instrument, volume, cmd=1)  # SELL
+                    if response.get('status'):
+                        flags[sf] = True
+                        profit = (current_price - buy_price[lv]) * volume
+                        caps[lv] += profit
+                        print(f"[SELL] Bot {bot.id}: Sprzedał na {lv} za {current_price}, zysk: {profit}")
 
-    # Gdy cena >= max_price => FINISHED
-    if current_price >= float(bot.max_price):
-        bot.status = 'FINISHED'
-        print(f"[{_timestamp()}] [Bot {bot.id}] Bot finished - price >= max_price")
+        # Aktualizacja danych w bazie
+        data["flags"] = flags
+        data["buy_price"] = buy_price
+        data["buy_volume"] = buy_volume
+        data["caps"] = caps
 
-    bot.levels_data = json.dumps(data)
-    await sync_to_async(bot.save)()
+        bot.levels_data = json.dumps(data)
+        await sync_to_async(bot.save)()
+
+    except Exception as e:
+        print(f"[ERROR] Bot {bot.id}: Błąd w logice poziomów - {e}")
+
+
 
 
 async def run_main_loop():
-    """
-    Główna korutyna:
-    - Co pewien czas szuka botów w statusie RUNNING
-    - Próbuje je łączyć z XTB i uruchamia monitorowanie ceny.
-    """
     while True:
         bots = await sync_to_async(list)(MicroserviceBot.objects.filter(status='RUNNING'))
+        active_bot_ids = {bot.id for bot in bots}
+
+        # Odłącz boty, które są nieaktywne
+        for bot_id in list(xtb_manager._connections.keys()):
+            if bot_id not in active_bot_ids:
+                await xtb_manager.disconnect_bot(bot_id)
+                print(f"[{_timestamp()}] [Bot {bot_id}] Disconnected due to inactivity.")
+
+        # Podłącz nowe boty
         for bot in bots:
-            ok = await xtb_manager.connect_bot(bot.id)
-            if ok:
-                print(f"[{_timestamp()}] [Bot {bot.id}] XTB connected.")
-                asyncio.create_task(monitor_price(bot.id, bot.instrument))
-            else:
-                print(f"[{_timestamp()}] [Bot {bot.id}] connect failed or already connected.")
-        await asyncio.sleep(60)  # Sprawdzaj co 60 sekund
+            if bot.id not in xtb_manager._connections:
+                ok = await xtb_manager.connect_bot(bot.id)
+                if ok:
+                    print(f"[{_timestamp()}] [Bot {bot.id}] XTB connected.")
+                    asyncio.create_task(monitor_price(bot.id, bot.instrument))
+                else:
+                    print(f"[{_timestamp()}] [Bot {bot.id}] Failed to connect.")
+
+        await asyncio.sleep(10)
+
 
 
 def start_bots_worker():

@@ -32,13 +32,14 @@ class MicroserviceBot(models.Model):
     max_price = models.DecimalField(max_digits=10, decimal_places=2)
     percent = models.IntegerField()
     capital = models.DecimalField(max_digits=12, decimal_places=2)
-   
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='NEW')
     created_at = models.DateTimeField(auto_now_add=True)
 
-    # Pola do logiki poziomów (JSON)
-    levels_data = models.TextField(blank=True, null=True)  
-    # np. { "lv1": 10.0, "lv2": 9.0, "lv3": 8.1, "flags": {...}, ... }
+    # Nowe pola:
+    account_currency = models.CharField(max_length=3, choices=[('PLN', 'PLN'), ('USD', 'USD')], default='PLN')
+    asset_currency = models.CharField(max_length=3, choices=[('PLN', 'PLN'), ('USD', 'USD'), ('EUR', 'EUR')], default='PLN')
+
+    levels_data = models.TextField(blank=True, null=True)  # Zapis wolumenów dla poziomów
     xtb_login = models.CharField(max_length=50, blank=True, null=True)
     xtb_password_enc = models.BinaryField(blank=True, null=True)
     def __str__(self):

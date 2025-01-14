@@ -20,6 +20,15 @@
             <label for="id_instrument">Aktywo (np. US500, EURUSD):</label>
             <input type="text" name="instrument" id="id_instrument" required>
         </div>
+         <!-- Waluta aktywa -->
+         <div class="form-group">
+            <label for="id_asset_currency">Waluta aktywa:</label>
+            <select name="asset_currency" id="id_asset_currency" required>
+                <option value="PLN">PLN</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+            </select>
+        </div>
 
         <!-- Min Price -->
         <div class="form-group">
@@ -41,8 +50,18 @@
 
         <!-- Kapitał -->
         <div class="form-group">
-            <label for="id_capital">Kapitał (PLN):</label>
+            <label for="id_capital">Kapitał:</label>
             <input type="number" step="0.01" name="capital" id="id_capital" required>
+        </div>
+
+         <!-- Kapitał -->
+        <div class="form-group">
+            <label for="id_capital">Kapitał:</label>
+            <input type="number" step="0.01" name="capital" id="id_capital" required>
+            <select name="account_currency" id="id_account_currency" required>
+                <option value="PLN">PLN</option>
+                <option value="USD">USD</option>
+            </select>
         </div>
 
         <!-- XTB ID -->
@@ -56,7 +75,7 @@
             <label for="id_xtb_password">XTB Password:</label>
             <input type="password" name="xtb_password" id="id_xtb_password" required>
         </div>
-        
+
         <button type="submit" class="btn btn-primary">Utwórz Bota</button>
     </form>
 </div>
