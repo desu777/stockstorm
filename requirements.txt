@@ -1,0 +1,8 @@
+django>=5.1.4
+mysqlclient>=2.2.0  # Lub pymysql>=1.0.2, zależnie od preferencji
+websocket-client>=1.5.1
+cryptography>=41.0.4
+djangorestframework>=3.14.0
+djangorestframework-simplejwt>=5.3.0
+requests>=2.31.0  # Wysyłanie żądań HTTP (potrzebne do komunikacji z mikroserwisem)
+python-dotenv>=1.0.0  # Wczytywanie zmiennych środowiskowych (opcjonalne)
