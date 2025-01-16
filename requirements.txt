@@ -1,3 +1,9 @@
+celery
+websockets
+python3-dev
+default-libmysqlclient-dev
+build-essential
+pkg-config
 django>=5.1.4
 mysqlclient>=2.2.0  # Lub pymysql>=1.0.2, zależnie od preferencji
 websocket-client>=1.5.1
