@@ -15,23 +15,21 @@ def _timestamp():
     return datetime.datetime.utcnow().isoformat()
 
 
-def get_current_price(symbol: str):
-    """
-    Zwraca aktualną cenę instrumentu pobraną z instrument_prices.
-    """
-    data = instrument_prices.get(symbol, {})
+def get_current_price(bot_id: int, symbol: str):
+    data = instrument_prices.get((bot_id, symbol), {})  # <-- poprawione
     ask = data.get("ask")
     bid = data.get("bid")
     if ask is not None and bid is not None:
-        return (ask + bid) / 2
+        return (ask + bid)/2
     return None
+
 
 
 async def monitor_price(bot_id: int, symbol: str, interval: float = 0.5):
     last_price = None
     while True:
         try:
-            current_price = get_current_price(symbol)
+            current_price = get_current_price(bot_id, symbol)
             if current_price is not None:
                 if current_price != last_price:
                     bot = await sync_to_async(MicroserviceBot.objects.get)(pk=bot_id)
