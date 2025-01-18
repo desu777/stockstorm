@@ -69,25 +69,53 @@ class _XTBConnection:
         return True
 
     async def _update_prices_loop(self):
+        """
+        W pętli pobieramy:
+         1) Główny instrument (self.instrument),
+         2) Dodatkowo USDPLN (jeśli bot potrzebuje przeliczeń PLN->USD).
+        """
         global instrument_prices
         while self.is_connected:
             try:
-                cmd = {"command": "getSymbol", "arguments": {"symbol": self.instrument}}
-                await self.send_message(self.main_ws, cmd, "getSymbol")
-                resp = await self.receive_message(self.main_ws, "getSymbol")
-                if resp.get("status"):
-                    return_data = resp.get("returnData", {})
+                # 1) Pobierz dane głównego instrumentu (np. RIOT.US)
+                cmd_main = {
+                    "command": "getSymbol",
+                    "arguments": {"symbol": self.instrument}
+                }
+                await self.send_message(self.main_ws, cmd_main, "getSymbol")
+                resp_main = await self.receive_message(self.main_ws, "getSymbol")
+                if resp_main.get("status"):
+                    rd_main = resp_main.get("returnData", {})
                     instrument_prices[(self.bot_id, self.instrument)] = {
-                        "ask": return_data.get("ask"),
-                        "bid": return_data.get("bid"),
+                        "ask": rd_main.get("ask"),
+                        "bid": rd_main.get("bid"),
                         "timestamp": self._timestamp()
                     }
-                    print(f"[{self._timestamp()}] [Bot {self.bot_id}] Updated price: {instrument_prices[(self.bot_id, self.instrument)]}")
+                    print(f"[{self._timestamp()}] [Bot {self.bot_id}] Updated price for {self.instrument}: {instrument_prices[(self.bot_id, self.instrument)]}")
                 else:
-                    print(f"[{self._timestamp()}] [Bot {self.bot_id}] Error in getSymbol response: {resp}")
+                    print(f"[{self._timestamp()}] [Bot {self.bot_id}] Error in getSymbol response (main): {resp_main}")
+
+                # 2) Pobierz kurs USDPLN, by móc liczyć wolumen dla PLN -> USD
+                cmd_usdpln = {
+                    "command": "getSymbol",
+                    "arguments": {"symbol": "USDPLN"}
+                }
+                await self.send_message(self.main_ws, cmd_usdpln, "getSymbol")
+                resp_usdpln = await self.receive_message(self.main_ws, "getSymbol")
+                if resp_usdpln.get("status"):
+                    rd_usdpln = resp_usdpln.get("returnData", {})
+                    instrument_prices[(self.bot_id, "USDPLN")] = {
+                        "ask": rd_usdpln.get("ask"),
+                        "bid": rd_usdpln.get("bid"),
+                        "timestamp": self._timestamp()
+                    }
+                    print(f"[{self._timestamp()}] [Bot {self.bot_id}] Updated price for USDPLN: {instrument_prices[(self.bot_id, 'USDPLN')]}")
+                else:
+                    print(f"[{self._timestamp()}] [Bot {self.bot_id}] Error in getSymbol response (USDPLN): {resp_usdpln}")
+
             except Exception as e:
                 print(f"[{self._timestamp()}] [Bot {self.bot_id}] Price update error: {e}")
-                await asyncio.sleep(5)  # Poczekaj przed reconnectem
+                await asyncio.sleep(5)  # Poczekaj przed próbą reconnect
                 await self.reconnect()
 
             await asyncio.sleep(0.5)
@@ -97,11 +125,9 @@ class _XTBConnection:
         await self.close()
         await self.connect()
 
-
-
     async def trade_transaction(self, symbol, volume, cmd):
         # Ustawienie ceny: ASK dla BUY, BID dla SELL
-        current_price = instrument_prices.get(symbol, {}).get("ask" if cmd == 0 else "bid", 0)
+        current_price = instrument_prices.get((self.bot_id, symbol), {}).get("ask" if cmd == 0 else "bid", 0)
 
         if current_price == 0:
             #print(f"[{self._timestamp()}] [Bot {self.bot_id}] Błąd: Brak aktualnej ceny dla {symbol}.")
@@ -173,9 +199,6 @@ class XTBManager:
         return ok
 
     async def trade_bot(self, bot_id: int, symbol: str, volume: float, cmd=0):
-        """
-        Wysyła zlecenie kupna/sprzedaży do XTB z limitem 5 prób i sprawdzeniem salda.
-        """
         max_retries = 5
         attempt = 0
 
@@ -184,9 +207,7 @@ class XTBManager:
             print(f"[{self._timestamp()}] [trade_bot] Bot {bot_id} not connected or missing!")
             return {"status": False, "errorCode": "NOT_CONNECTED"}
 
-        # Pobranie salda użytkownika
-        user_profile = await sync_to_async(UserProfile.objects.get)(user_id=bot_id)
-        available_balance = user_profile.balance - user_profile.reserved_balance
+        # (Jeśli usunąłeś logikę salda user_profile to jej tu nie ma)
 
         # Pobranie aktualnej ceny instrumentu
         current_price = instrument_prices.get((bot_id, symbol), {}).get("ask" if cmd == 0 else "bid", 0)
@@ -194,23 +215,23 @@ class XTBManager:
             print(f"[{self._timestamp()}] [Bot {bot_id}] Brak aktualnej ceny dla {symbol}.")
             return {"status": False, "errorCode": "NO_PRICE"}
 
-        # Sprawdzenie czy saldo jest wystarczające
-        transaction_cost = current_price * volume
-        if available_balance < transaction_cost:
-            print(f"[{self._timestamp()}] [Bot {bot_id}] Insufficient balance: {available_balance} < {transaction_cost}")
-            return {"status": False, "errorCode": "INSUFFICIENT_FUNDS"}
-
-        # Wysyłanie zlecenia z limitem prób
         while attempt < max_retries:
             try:
+                print(f"[{self._timestamp()}] [Bot {bot_id}] attempt={attempt+1}, trade_transaction({symbol}, vol={volume}, cmd={cmd})")
                 response = await self._connections[bot_id].trade_transaction(symbol, volume, cmd)
+
+                # TU KLUCZOWY PRINT:
+                print(f"[DEBUG] [trade_bot] XTB raw response: {response}")
+
                 if response.get("status"):
                     print(f"[{self._timestamp()}] [Bot {bot_id}] Trade successful: {response}")
                     return response
                 else:
+                    # Tu zobaczysz kod błędu i opis
+                    print(f"[{self._timestamp()}] [Bot {bot_id}] Trade failed -> errorCode={response.get('errorCode')}, descr={response.get('errorDescr')}")
                     print(f"[{self._timestamp()}] [Bot {bot_id}] Trade failed, retrying in 5 minutes... Attempt {attempt + 1}")
                     attempt += 1
-                    await asyncio.sleep(300)
+                    await asyncio.sleep(300)  # 5 minut
             except Exception as e:
                 print(f"[{self._timestamp()}] [Bot {bot_id}] Trade error: {e}")
                 attempt += 1
@@ -223,8 +244,6 @@ class XTBManager:
         print(f"[{self._timestamp()}] [Bot {bot_id}] Too many failed attempts. Status set to ERROR.")
         return {"status": False, "errorCode": "MAX_RETRIES_EXCEEDED"}
 
-
-
     async def disconnect_bot(self, bot_id: int):
         if bot_id in self._connections:
             await self._connections[bot_id].close()
@@ -234,6 +253,7 @@ class XTBManager:
                 del instrument_prices[key]
                 print(f"[{self._timestamp()}] [disconnect_bot] Removed instrument {key} from instrument_prices.")
             del self._connections[bot_id]
+
 
 
 xtb_manager = XTBManager()
