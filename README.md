@@ -14,6 +14,9 @@ This project implements a Django-based **microservice** designed for managing an
 - **Bot Management**:
   - Create, view, edit, and delete trading bots.
   - Define bot parameters like trading instrument, price levels, and target profit percentage.
+![start2](https://github.com/user-attachments/assets/410bce83-6bf2-4e29-bb34-7783e242c1b3)
+![start3](https://github.com/user-attachments/assets/2a5c5a00-d8b5-4d15-bd89-5d772a4a0383)
+
 - **Real-Time Trading**:
   - Integrates with XTB WebSocket API for real-time price updates.
   - Automatically triggers buy/sell orders based on predefined logic.
