@@ -2,19 +2,71 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>STOCKSTORM</title>
-    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Ikonka strony (opcjonalnie) -->
+    <link rel="icon" type="image/png" href="{% static 'images/icons/favicon.ico' %}"/>
+
+    <!-- Główne style "Login V3" -->
+    <link rel="stylesheet" type="text/css" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'fonts/font-awesome-4.7.0/css/font-awesome.min.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'fonts/iconic/css/material-design-iconic-font.min.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'vendor/animate/animate.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'vendor/css-hamburgers/hamburgers.min.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'vendor/animsition/css/animsition.min.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'vendor/select2/select2.min.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'vendor/daterangepicker/daterangepicker.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/util.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
 </head>
 <body>
-    <!-- Tło strony -->
-    <div class="background">
-        <!-- Przyciski Log In i Sign Up -->
-        <div class="buttons">
-            <a href="{% url 'login' %}" class="button">Log In</a>
-            <a href="{% url 'register' %}" class="button">Sign Up</a>
+
+    <div class="limiter">
+        <!-- Kontener z tłem -->
+        <div class="container-login100" style="background-image: url('{% static 'images/bg-01.jpg' %}');">
+            <!-- Boks wewnętrzny (wycentrowany) -->
+            <div class="wrap-login100">
+                <!-- Logo / ikona u góry (opcjonalnie) -->
+                <span class="login100-form-logo">
+                    <i class="zmdi zmdi-landscape"></i>
+                </span>
+
+                <!-- Powitanie -->
+                <span class="login100-form-title p-b-34 p-t-27">
+                    Welcome to Stockstorm!
+                </span>
+
+                <!-- Przyciski: Log In / Sign Up -->
+                <div class="container-login100-form-btn" style="margin-top: 30px;">
+                    <a href="{% url 'login' %}" class="login100-form-btn">
+                        Log In
+                    </a>
+                </div>
+                <div class="container-login100-form-btn" style="margin-top: 20px;">
+                    <a href="{% url 'register' %}" class="login100-form-btn">
+                        Sign Up
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
+
+    <!-- Element z oryginalnego szablonu -->
+    <div id="dropDownSelect1"></div>
+
+    <!-- Skrypty JS "Login V3" -->
+    <script src="{% static 'vendor/jquery/jquery-3.2.1.min.js' %}"></script>
+    <script src="{% static 'vendor/animsition/js/animsition.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/js/popper.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.min.js' %}"></script>
+    <script src="{% static 'vendor/select2/select2.min.js' %}"></script>
+    <script src="{% static 'vendor/daterangepicker/moment.min.js' %}"></script>
+    <script src="{% static 'vendor/daterangepicker/daterangepicker.js' %}"></script>
+    <script src="{% static 'vendor/countdowntime/countdowntime.js' %}"></script>
+    <script src="{% static 'js/main.js' %}"></script>
+
 </body>
 </html>
+
