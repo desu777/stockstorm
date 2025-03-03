@@ -42,6 +42,8 @@ This project implements a Django-based **microservice** designed for managing an
 
 ---
 
+Token in codes are only for presentation and testing.
+
 ## 📝 **Installation and Setup**
 
 ### 1. Clone the Repository
