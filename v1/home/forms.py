@@ -49,3 +49,36 @@ class BotForm(forms.ModelForm):
             'percent', 'capital',
             'stream_session_id'
         ]
+
+#---------------------------------------------------------#
+
+class BinanceApiForm(forms.ModelForm):
+    binance_api_secret = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': '••••••••'}),
+        required=False,
+        help_text="Leave empty to keep your existing secret"
+    )
+    
+    class Meta:
+        model = UserProfile
+        fields = ['binance_api_key']
+        widgets = {
+            'binance_api_key': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+    
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        
+        # Get the plaintext secret from the form
+        binance_api_secret = self.cleaned_data.get('binance_api_secret')
+        
+        # Only update the secret if one was provided
+        if binance_api_secret:
+            instance.set_binance_api_secret(binance_api_secret)
+            
+        if commit:
+            instance.save()
+        
+        return instance

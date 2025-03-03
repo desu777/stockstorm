@@ -22,4 +22,6 @@ from django.urls import path,include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('home.urls')),  # Dołączenie URL-i z aplikacji home
+    path('hpcrypto/', include('hpcrypto.urls')),
+
 ]

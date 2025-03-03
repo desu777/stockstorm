@@ -62,35 +62,76 @@ def forgot_password_view(request):
 
 @login_required
 def profile_view(request):
-    """
-    Przykładowy widok profilowy, zarządzanie XTBConnection.
-    """
-    xtb_connection = XTBConnection.objects.filter(user=request.user).first()
-    session_id = xtb_connection.stream_session_id if xtb_connection else None
-    manager = XTBConnectionManager()
-
+    # Get or create the user's profile
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+    
+    # Initialize forms
+    xtb_form = XTBConnectionForm(instance=getattr(request.user, 'xtb_connection', None))
+    binance_form = BinanceApiForm(instance=profile)
+    
+    binance_status = None  # Will store connection test result
+    
     if request.method == 'POST':
-        form = XTBConnectionForm(request.POST, instance=xtb_connection)
-        if form.is_valid():
-            xtb_connection = form.save(commit=False)
-            xtb_connection.user = request.user
-            xtb_connection.save()
-
-            if manager.connect(xtb_connection=xtb_connection):
-                session_id = manager.connections.get(request.user.id, {}).get('stream_session_id')
-                messages.success(request, "Pomyślnie połączono z XTB API!")
-            else:
-                messages.error(request, "Nie udało się połączyć z XTB API!")
-
-            return redirect('profile')
-        else:
-            messages.error(request, "Błąd w formularzu. Spróbuj ponownie.")
-    else:
-        form = XTBConnectionForm(instance=xtb_connection)
-
+        form_type = request.POST.get('form_type')
+        
+        if form_type == 'xtb_connection':
+            # Handle the existing XTB connection form
+            xtb_form = XTBConnectionForm(request.POST, instance=getattr(request.user, 'xtb_connection', None))
+            if xtb_form.is_valid():
+                connection = xtb_form.save(commit=False)
+                connection.user = request.user
+                connection.save()
+                
+                # Test XTB connection
+                if connection.connect_to_xtb():
+                    messages.success(request, "Successfully connected to XTB!")
+                else:
+                    messages.error(request, "Failed to connect to XTB. Check your credentials.")
+                    
+                return redirect('profile')
+                
+        elif form_type == 'binance_api':
+            # Handle the Binance API form
+            binance_form = BinanceApiForm(request.POST, instance=profile)
+            if binance_form.is_valid():
+                test_connection = request.POST.get('test_connection') == 'on'
+                
+                if test_connection:
+                    # Test the Binance connection
+                    api_key = binance_form.cleaned_data['binance_api_key']
+                    api_secret = request.POST.get('binance_api_secret')
+                    
+                    # If no new secret provided but we have one stored, use the stored one
+                    if not api_secret and profile.binance_api_secret_enc:
+                        api_secret = profile.get_binance_api_secret()
+                    
+                    # Only test if we have both key and secret
+                    if api_key and api_secret:
+                        binance_status = test_binance_connection(api_key, api_secret)
+                        
+                        if "Success" not in binance_status:
+                            # Show error but don't save invalid credentials
+                            messages.error(request, f"Binance connection failed: {binance_status}")
+                            return render(request, 'profile.html', {
+                                'xtb_form': xtb_form,
+                                'binance_form': binance_form,
+                                'binance_status': binance_status,
+                                'session_id': getattr(getattr(request.user, 'xtb_connection', None), 'stream_session_id', None)
+                            })
+                
+                # Save the form (only saves key, secret is handled separately)
+                profile = binance_form.save()
+                messages.success(request, "Binance API settings saved successfully!")
+                return redirect('profile')
+    
+    # Get XTB session_id for display
+    session_id = getattr(getattr(request.user, 'xtb_connection', None), 'stream_session_id', None)
+    
     return render(request, 'profile.html', {
-        'form': form,
-        'session_id': session_id,
+        'xtb_form': xtb_form,
+        'binance_form': binance_form,
+        'binance_status': binance_status,
+        'session_id': session_id
     })
 
 

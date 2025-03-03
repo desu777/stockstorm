@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'home',
+    'hpcrypto',
     'rest_framework',
     'rest_framework.authtoken',
 ]
@@ -154,7 +155,5 @@ MICROSERVICE_URL = "http://127.0.0.1:8001/create_bot/"
 MICROSERVICE_URL2 = "http://127.0.0.1:8005"
 BNB_MICROSERVICE_URL="http://127.0.0.1:8006"
 XTB_D ="http://127.0.0.1:8004"
-
-
 
 

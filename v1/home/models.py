@@ -199,3 +199,22 @@ class Bot(models.Model):
         return f"Bot {self.name} (user={self.user}, {self.instrument}, {self.status})"
 
 
+class UserProfile(models.Model):
+    # Existing fields
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    # Keep any existing fields you have
+    
+    # Add new Binance API fields
+    binance_api_key = models.CharField(max_length=255, blank=True, null=True)
+    binance_api_secret_enc = models.BinaryField(blank=True, null=True)
+    
+    def set_binance_api_secret(self, plain_secret):
+        """Encrypts and stores the Binance API secret"""
+        if plain_secret:
+            self.binance_api_secret_enc = fernet.encrypt(plain_secret.encode('utf-8'))
+    
+    def get_binance_api_secret(self):
+        """Decrypts and returns the Binance API secret"""
+        if self.binance_api_secret_enc:
+            return fernet.decrypt(self.binance_api_secret_enc).decode('utf-8')
+        return None
