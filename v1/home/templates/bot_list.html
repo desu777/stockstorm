@@ -1,54 +1,74 @@
 {% extends "base.html" %}
 
 {% block title %}
-  Lista Botów | STOCKstorm
+  Bot List | STOCKstorm
 {% endblock %}
 
 {% block content %}
-<div style="margin: 1rem;">
-  <h2 style="margin-bottom: 1rem;">Twoje Boty</h2>
+<div class="bot-container">
+  <h2>XTB Bots</h2>
   
   <!-- Przycisk dodania nowego bota -->
-  <div style="margin-bottom: 1rem;">
-    <a href="{% url 'bot_add' %}" style="background: #007bff; color: #fff; padding: 10px 15px; border-radius: 5px; text-decoration: none;">Dodaj nowego bota</a>
-  </div>
+  <a href="{% url 'bot_add' %}" class="add-bot-button">Add new bot</a>
 
-  <!-- Przykładowa tabela z botami -->
-  <table>
+  <!-- Tabela z botami -->
+  <table class="bot-table">
     <thead>
       <tr>
         <th>Bot ID</th>
-        <th>Nazwa</th>
-        <th>Aktywo</th>
+        <th>Name</th>
+        <th>Asset</th>
         <th>Status</th>
-        <th>Kapitał</th>
-        <th>Akcje</th>
+        <th>Capital</th>
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody>
       {% for bot in bots %}
-      <tr>
+      <tr id="bot-row-{{ bot.id }}">
         <td>{{ bot.id }}</td>
         <td>{{ bot.name }}</td>
         <td>{{ bot.instrument }}</td>
-        <td>{{ bot.status }}</td>
+        <td class="bot-status" data-bot-id="{{ bot.id }}">{{ bot.status }}</td>
         <td>{{ bot.capital }}</td>
-        <td>
+        <td class="bot-actions">
           <!-- Szczegóły bota -->
-          <a href="{% url 'bot_detail' bot.id %}" style="margin-right:10px;">Szczegóły</a>
+          <a href="{% url 'bot_detail' bot.id %}">Details</a>
           <!-- Usuń / zatrzymaj bota -->
           <form action="{% url 'bot_remove' bot.id %}" method="post" style="display:inline;">
             {% csrf_token %}
-            <button type="submit" style="background:#dc3545; color:#fff; padding:5px 10px; border-radius:5px; cursor:pointer;">Usuń</button>
+            <button type="submit">Delete</button>
           </form>
         </td>
       </tr>
       {% empty %}
       <tr>
-        <td colspan="6" style="text-align:center;">Brak botów do wyświetlenia.</td>
+        <td colspan="6" class="bot-table-empty">No bots to display.</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const statusElements = document.querySelectorAll('.bot-status');
+
+    statusElements.forEach(function(element) {
+      const botId = element.getAttribute('data-bot-id');
+      fetch(`/bot/${botId}/status/`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.status) {
+            element.textContent = data.status;
+          } else if (data.error) {
+            console.error(`Error fetching status for bot ${botId}: ${data.error}`);
+          }
+        })
+        .catch(error => {
+          console.error(`Fetch error for bot ${botId}:`, error);
+        });
+    });
+  });
+</script>
 {% endblock %}

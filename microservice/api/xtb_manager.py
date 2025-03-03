@@ -13,8 +13,6 @@ instrument_prices = {}
 
 
 
-
-
 class _XTBConnection:
     def __init__(self, bot_id: int, login: str, password: str, instrument: str):
         self.bot_id = bot_id
@@ -118,7 +116,7 @@ class _XTBConnection:
                 await asyncio.sleep(5)  # Poczekaj przed próbą reconnect
                 await self.reconnect()
 
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1)
 
     async def reconnect(self):
         print(f"[{self._timestamp()}] [Bot {self.bot_id}] Reconnecting...")

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}
+  BNB Bot details | STOCKstorm
+{% endblock %}
+
+{% block content %}
+<div class="bot-details-container">
+  <h2>BNB Bot Details: {{ bot.name }}</h2>
+
+  <div class="bot-info-wrapper">
+    <div class="bot-info-left">
+      <p><strong>Symbol:</strong> {{ bot.instrument }}</p>
+      <p><strong>Status:</strong> {{ bot.status }}</p>
+      <p><strong>Max Price:</strong> {{ bot.max_price }}</p>
+      <p><strong>Percent:</strong> {{ bot.percent }}%</p>
+      <p><strong>Capital:</strong> {{ bot.capital }}</p>
+      <p><strong>Created At:</strong> {{ bot.created_at }}</p>
+      <p><strong>Finished At:</strong> {{ bot.finished_at }}</p>
+      
+      <!-- Całkowity Zysk -->
+      <h3>Total Profit</h3>
+      <p class="total-profit" id="total-profit">{{ bot_details.total_profit }}</p>
+      
+      <!-- Zysk % na Kapitale -->
+      <h3>Profit % on Capital</h3>
+      <p class="profit-percentage" id="profit-percentage">-</p>
+    </div>
+
+    <!-- Tabela poziomów handlowych (grid) -->
+    <div class="bot-info-right">
+      <h3>Grid Levels</h3>
+      <table class="levels-table">
+        <thead>
+          <tr>
+            <th>Level</th>
+            <th>Price</th>
+            <th>Capital</th>
+            <th>TP Count</th>
+            <th>Profit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lv, details in bot_details.levels.items %}
+          <tr id="level-{{ lv }}">
+            <td>{{ lv }}</td>
+            <td id="{{ lv }}-price">{{ details.price }}</td>
+            <td id="{{ lv }}-capital">{{ details.capital }}</td>
+            <td id="{{ lv }}-tp">{{ details.tp }}</td>
+            <td id="{{ lv }}-profit">{{ details.profit }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <form action="{% url 'export_bnb_trades' bot.id %}" method="GET" style="display: inline;">
+    <button type="submit" class="action-button1">
+      Pobierz transakcje do CSV
+    </button>
+  </form>
+
+  <!-- Przycisk usunięcia bota (o ile status != FINISHED) -->
+  {% if bot.status != "FINISHED" %}
+  <form action="{% url 'bnb_delete' bot.id %}" method="post" style="text-align: center; margin-top: 2rem;">
+    {% csrf_token %}
+    <button type="submit" class="action-button">Stop / Delete BNB Bot</button>
+  </form>
+  {% endif %}
+</div>
+
+<!-- JavaScript do aktualizacji danych (opcjonalnie) -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+  const apiEndpoint = "{% url 'get_bot_details_proxy' bot.id %}";
+
+  function updateBotDetails() {
+    $.ajax({
+      url: apiEndpoint,
+      method: 'GET',
+      success: function(data) {
+        if (data.error) {
+          console.error(data.error);
+          alert("Could not fetch bot data. Try again later.");
+          return;
+        }
+
+        let totalProfit = 0;
+        // Aktualizacja danych dla każdego levelu
+        for (const [lv, details] of Object.entries(data.levels)) {
+          $(`#${lv}-price`).text(parseFloat(details.price).toFixed(3));
+          $(`#${lv}-capital`).text(parseFloat(details.capital).toFixed(2));
+          $(`#${lv}-tp`).text(details.tp);
+          $(`#${lv}-profit`).text(parseFloat(details.profit).toFixed(2));
+
+          totalProfit += parseFloat(details.profit);
+        }
+
+        // Całkowity zysk
+        $("#total-profit").text(totalProfit.toFixed(2));
+
+        // Zysk % na kapitale
+        const capital = parseFloat(data.capital);
+        if (!isNaN(capital) && capital !== 0) {
+          const profitPercentage = (totalProfit / capital) * 100;
+          $("#profit-percentage").text(profitPercentage.toFixed(2) + "%");
+        } else {
+          $("#profit-percentage").text("N/A");
+        }
+      },
+      error: function(xhr, status, error) {
+        console.error("Error fetching bot data:", error);
+        alert("Error fetching bot data. Please try again later.");
+      }
+    });
+  }
+
+  // Interval co 5s
+  setInterval(updateBotDetails, 5000);
+  $(document).ready(updateBotDetails);
+</script>
+{% endblock %}

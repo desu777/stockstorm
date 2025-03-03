@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Czy na pewno chcesz usunąć bota: {{ bot.name }}?</h2>
+<form method="post">
+  {% csrf_token %}
+  <button type="submit">Potwierdź</button>
+</form>
+<a href="{% url 'bot_list' %}">Anuluj</a>
+{% endblock %}

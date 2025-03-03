@@ -1,60 +1,102 @@
 {% extends "base.html" %}
 
 {% block title %}
-  Szczegóły Bota | STOCKstorm
+  Bot details | STOCKstorm
 {% endblock %}
 
 {% block content %}
-<div style="margin: 1rem;">
-  <h2>Szczegóły Bota: {{ bot.name }}</h2>
+<div class="bot-details-container">
+  <!-- Nagłówek -->
+  <h2>Bot Details: {{ bot.name }}</h2>
 
-  <div style="background:#fff; padding:1rem; border-radius:8px; margin-bottom:1rem;">
-    <p><strong>Aktywo:</strong> {{ bot.instrument }}</p>
-    <p><strong>Status:</strong> {{ bot.status }}</p>
-    <p><strong>Min Price:</strong> {{ bot.min_price }}</p>
-    <p><strong>Max Price:</strong> {{ bot.max_price }}</p>
-    <p><strong>Procent:</strong> {{ bot.percent }}%</p>
-    <p><strong>Kapitał:</strong> {{ bot.capital }}</p>
+  <!-- Sekcja szczegółów bota -->
+  <div class="bot-info-wrapper">
+    <div class="bot-info-left">
+      <p><strong>Asset:</strong> {{ bot.instrument }}</p>
+      <p><strong>Status:</strong> {{ bot.status }}</p>
+      <p><strong>Max Price:</strong> {{ bot.max_price }}</p>
+      <p><strong>Percent:</strong> {{ bot.percent }}%</p>
+      <p><strong>Capital:</strong> {{ bot.capital }}</p>
+      <p><strong>Created At:</strong> {{ bot.created_at }}</p>
+      <p><strong>Finished At:</strong> {{bot.finished_at}}</p>
+      
+      <!-- Całkowity Zysk -->
+      <h3>Całkowity Zysk</h3>
+      <p class="total-profit" id="total-profit">{{ bot_details.total_profit }}</p>
+      
+      <!-- Zysk % na Kapitale -->
+      <h3>Zysk % na Kapitale</h3>
+      <p class="profit-percentage" id="profit-percentage">-</p>
+    </div>
+
+    <!-- Tabela poziomów handlowych -->
+    <div class="bot-info-right">
+      <h3>Poziomy Handlowe</h3>
+      <table class="levels-table">
+        <thead>
+          <tr>
+            <th>Level</th>
+            <th>Cena</th>
+            <th>Kapitał</th>
+            <th>Liczba TP</th>
+            <th>Zysk</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lv, details in bot_details.levels.items %}
+          <tr id="level-{{ lv }}">
+            <td>{{ lv }}</td>
+            <td id="{{ lv }}-price">{{ details.price }}</td>
+            <td id="{{ lv }}-capital">{{ details.capital }}</td>
+            <td id="{{ lv }}-tp">{{ details.tp }}</td>
+            <td id="{{ lv }}-profit">{{ details.profit }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
-
-  <!-- Sekcja poziomów -->
-  <h3>Poziomy Handlowe</h3>
-  <table id="levels-table" border="1" cellpadding="5" cellspacing="0">
-    <thead>
-      <tr>
-        <th>Level</th>
-        <th>Cena</th>
-        <th>Kapitał</th>
-        <th>Liczba TP</th>
-        <th>Zysk</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for lv, details in bot_details.levels.items %}
-        <tr id="level-{{ lv }}">
-          <td>{{ lv }}</td>
-          <td id="{{ lv }}-price">{{ details.price }}</td>
-          <td id="{{ lv }}-capital">{{ details.capital }}</td>
-          <td id="{{ lv }}-tp">{{ details.tp }}</td>
-          <td id="{{ lv }}-profit">{{ details.profit }}</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-  <h3>Całkowity Zysk</h3>
-  <p id="total-profit">{{ bot_details.total_profit }}</p>
-
-  <!-- Przycisk zatrzymania bota (o ile bot nie jest już zakończony) -->
-  {% if bot.status != "FINISHED" %}
-  <div style="margin-top: 1rem;">
-    <form action="{% url 'bot_remove' bot.id %}" method="post" style="display:inline;">
-      {% csrf_token %}
-      <button type="submit" style="background:#dc3545; color:#fff; padding:8px 15px; border-radius:5px; cursor:pointer;">
-        Zatrzymaj/Usuń bota
+  <div style="text-align: center; margin-top: 2rem;">
+    <!-- Przycisk pobrania CSV -->
+    <form action="{% url 'export_bot_trades' bot.id %}" method="GET" style="display: inline;">
+      <button type="submit" class="action-button1">
+        Pobierz transakcje do CSV
       </button>
     </form>
+    <button id="btnCheckConn" class="action-button1">Sprawdź połączenie z XTB</button>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script>
+    $("#btnCheckConn").click(function(e){
+      e.preventDefault();
+
+      $.ajax({
+        url: "{% url 'check_broker_connection' bot.id %}",
+        method: "GET",
+        success: function(resp) {
+          if(resp.ok) {
+            alert("OK: " + resp.message);
+          } else {
+            alert("Błąd: " + resp.message);
+          }
+        },
+        error: function(xhr) {
+          alert("Błąd AJAX: " + xhr.status + " " + xhr.statusText);
+        }
+      });
+    });
+  </script>
+  
+    <!-- (Opcjonalnie) Drugi przycisk do czegoś innego -->
+    <!-- <button type="button" class="action-button">Inna akcja</button> -->
   </div>
+
+  <!-- Przycisk zatrzymania bota -->
+  {% if bot.status != "FINISHED" %}
+  <form action="{% url 'bot_remove' bot.id %}" method="post" style="text-align: center; margin-top: 2rem;">
+    {% csrf_token %}
+    <button type="submit" class="action-button">Zatrzymaj/Usuń bota</button>
+  </form>
   {% endif %}
 </div>
 
@@ -88,6 +130,16 @@
 
         // Aktualizacja całkowitego zysku
         $("#total-profit").text(totalProfit.toFixed(2));
+
+        // Pobranie kapitału bota
+        const capital = parseFloat(data.capital);
+        if (!isNaN(capital) && capital !== 0) {
+          // Obliczenie zysku procentowego na kapitale
+          const profitPercentage = (totalProfit / capital) * 100;
+          $("#profit-percentage").text(profitPercentage.toFixed(2) + "%");
+        } else {
+          $("#profit-percentage").text("N/A");
+        }
       },
       error: function(xhr, status, error) {
         console.error("Błąd podczas pobierania danych bota:", error);
@@ -101,3 +153,4 @@
   $(document).ready(updateBotDetails);
 </script>
 {% endblock %}
+

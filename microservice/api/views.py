@@ -25,11 +25,13 @@ from django.contrib.auth.models import User
 from rest_framework.authentication import BaseAuthentication, get_authorization_header
 from rest_framework.exceptions import AuthenticationFailed
 from django.contrib.auth.models import AnonymousUser
-
-
+from asgiref.sync import async_to_sync
 from rest_framework.authentication import BaseAuthentication, get_authorization_header
 from rest_framework.exceptions import AuthenticationFailed
 from django.contrib.auth.models import User
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
+from api.models import MicroserviceBot
 
 class CustomAuthentication(BaseAuthentication):
     """
@@ -188,13 +190,12 @@ def create_bot(request):
     xtb_id = request.data.get('xtb_id')
     xtb_password = request.data.get('xtb_password')
 
-    levels = generate_levels(min_price, max_price, percent, capital)
+    levels = generate_levels(max_price, percent, capital)
 
     bot = MicroserviceBot.objects.create(
         user_id=user_id,
         name=name,
         instrument=instrument,
-        min_price=min_price,
         max_price=max_price,
         percent=percent,
         capital=capital,
@@ -215,31 +216,62 @@ def create_bot(request):
     }, status=200)
 
 
-def generate_levels(min_price, max_price, pct, capital):
-    current_level = float(max_price)
-    min_p = float(min_price)
+# api/xtb_manager.py
+
+def generate_levels(max_price, pct, capital):
+    """
+    Generates trading levels at fixed percentage intervals from the max_price,
+    oraz przypisuje poziomy sprzedaży dla każdego poziomu zakupu.
+    
+    Args:
+        max_price (float): The starting price for level 1 (highest price).
+        pct (float): The fixed percentage decrease for each subsequent level.
+        capital (float): The total capital allocated across all levels.
+    
+    Returns:
+        dict: A dictionary containing flags, caps, buy_price, buy_volume, sell_levels, and level prices.
+    """
+    max_p = float(max_price)
     pct_f = float(pct)
-    data = {"flags": {}, "caps": {}, "buy_price": {}, "buy_volume": {}}  # Dodajemy buy_volume
-    i = 1
+    data = {
+        "flags": {},
+        "caps": {},
+        "buy_price": {},
+        "buy_volume": {},
+        "sell_levels": {}
+    }
     total_lv_count = 0
+    i = 1
 
-    temp_level = current_level
-    while temp_level >= min_p:
+    # Calculate total number of levels until price approaches zero
+    while True:
+        lv_price = max_p * (1 - (i - 1) * pct_f / 100.0)
+        if lv_price <= 0:
+            break
         total_lv_count += 1
-        temp_level *= (1 - pct_f / 100.0)
+        i += 1
 
-    while current_level >= min_p:
-        lv_name = f"lv{i}"
-        data[lv_name] = round(current_level, 3)
+    # Generate levels in descending order (lv1 highest price, lv10 lowest)
+    for level_num in range(1, total_lv_count + 1):
+        lv_price = max_p * (1 - (level_num - 1) * pct_f / 100.0)
+        lv_name = f"lv{level_num}"
+        data[lv_name] = round(lv_price, 3)
         data["flags"][f"{lv_name}_bought"] = False
         data["flags"][f"{lv_name}_sold"] = False
+        data["flags"][f"{lv_name}_in_progress"] = False
         data["caps"][lv_name] = round(float(capital) / total_lv_count, 2)
         data["buy_price"][lv_name] = 0.0
-        data["buy_volume"][lv_name] = 0.0  # Dodajemy wolumen kupna
-        i += 1
-        current_level *= (1 - pct_f / 100.0)
+        data["buy_volume"][lv_name] = 0.0
+
+    # Assign sell_levels: lv2 -> lv1, lv3 -> lv2, ..., lv10 -> lv9
+    for level_num in range(2, total_lv_count + 1):
+        lv_buy = f"lv{level_num}"
+        lv_sell = f"lv{level_num - 1}"
+        data["sell_levels"][lv_buy] = lv_sell
+        print(f"[generate_levels] Created level {lv_buy} at price {data[lv_buy]}, sell_level={lv_sell}")
 
     return data
+
 
 
 @api_view(['POST'])
@@ -375,3 +407,133 @@ def get_bot_details(request, bot_id):
         "percent": bot.percent,
         "total_profit": total_profit,
     })
+
+
+@api_view(['GET'])
+@authentication_classes([CustomAuthentication])
+@permission_classes([IsAuthenticated])
+def get_bot_status(request, bot_id):
+    """
+    Endpoint zwracający status bota.
+    """
+    try:
+        # Pobierz bota o podanym ID
+        bot = get_object_or_404(MicroserviceBot, id=bot_id)
+        print(f"[DEBUG] Bot znaleziony: {bot}")  # Debug
+        print(f"[DEBUG] Status bota: {bot.status}")  # Debug
+        response_data = {
+            "bot_id": bot.id,
+            "status": bot.status,  # Zwracamy status bota
+            "name": bot.name,
+            "instrument": bot.instrument,
+        }
+        print(f"[DEBUG] Odpowiedź JSON: {response_data}")  # Debug
+        return JsonResponse(response_data, status=200)
+    except Exception as e:
+        print(f"[DEBUG] Wystąpił błąd: {str(e)}")  # Debug
+        return JsonResponse({
+            "error": "Failed to retrieve bot status",
+            "details": str(e),
+        }, status=500)
+
+
+
+#################################
+# Download trades in csv#
+# api/views.py (Mikroserwis)
+from django.http import HttpResponse
+import csv
+from io import StringIO
+
+@api_view(['GET'])
+@authentication_classes([CustomAuthentication])
+@permission_classes([IsAuthenticated])
+def export_bot_trades_csv(request, bot_id):
+    """
+    Zwraca transakcje (Trade) danego bota w formacie CSV,
+    zastępując kropkę przecinkiem w cenach.
+    """
+    try:
+        bot = MicroserviceBot.objects.get(id=bot_id, user_id=request.user.id)
+    except MicroserviceBot.DoesNotExist:
+        return Response({"error": "Bot not found or not owned by user"}, status=404)
+
+    # Pobieramy transakcje
+    trades = Trade.objects.filter(bot=bot).order_by('open_time')
+
+    # Generujemy CSV w pamięci
+    output = StringIO()
+    writer = csv.writer(output, delimiter=';')  # np. średnik, by Excel łatwiej to łyknął
+
+    # NAGŁÓWEK CSV
+    writer.writerow([
+        "Level", 
+        "Open Price", 
+        "Close Price", 
+        "Profit", 
+        "Open Time", 
+        "Close Time", 
+        "Status"
+    ])
+
+    for t in trades:
+        # Zamiana kropki na przecinek w stringach:
+        open_str = str(t.open_price).replace('.', ',') if t.open_price else ""
+        close_str = str(t.close_price).replace('.', ',') if t.close_price else ""
+        profit_str = str(t.profit).replace('.', ',') if t.profit else ""
+
+        # Formatowanie dat
+        open_time_str = t.open_time.strftime("%Y-%m-%d %H:%M") if t.open_time else ""
+        close_time_str = t.close_time.strftime("%Y-%m-%d %H:%M") if t.close_time else ""
+
+        writer.writerow([
+            t.level,
+            open_str,
+            close_str,
+            profit_str,
+            open_time_str,
+            close_time_str,
+            t.status
+        ])
+
+    response = HttpResponse(output.getvalue(), content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="bot_{bot_id}_trades.csv"'
+    return response
+
+###########################################################
+#### Sprawdzenie połączenia z klientem xtb ###########
+from .xtb_manager import xtb_manager  # <-- import managera
+
+@api_view(['GET'])
+@authentication_classes([CustomAuthentication])
+@permission_classes([IsAuthenticated])
+def check_xtb_connection(request, bot_id):
+    """
+    Sprawdza, czy bot ma aktualne połączenie (is_connected=True)
+    w xtb_manager._connections. Jeśli nie, próbuje się połączyć,
+    a w razie niepowodzenia zwraca błąd 400 i komunikat o 
+    możliwości niepoprawnych danych logowania.
+    """
+    try:
+        bot = MicroserviceBot.objects.get(id=bot_id, user_id=request.user.id)
+    except MicroserviceBot.DoesNotExist:
+        return Response({
+            "ok": False, 
+            "message": "Bot nie istnieje lub nie należy do usera."
+        }, status=404)
+
+    # Jeśli jeszcze nie ma obiektu w słowniku albo is_connected=False,
+    # próbujemy go połączyć
+    if bot_id not in xtb_manager._connections or not xtb_manager._connections[bot_id].is_connected:
+        ok = async_to_sync(xtb_manager.connect_bot)(bot_id)
+        if not ok:
+            return Response({
+                "ok": False,
+                "message": "Nie udało się nawiązać połączenia z XTB. (Możliwe złe dane logowania)."
+            }, status=400)
+
+    # Skoro tu doszliśmy, to bot ma już is_connected == True
+    return Response({
+        "ok": True,
+        "message": "Bot ma aktywne połączenie z XTB (is_connected)."
+    }, status=200)

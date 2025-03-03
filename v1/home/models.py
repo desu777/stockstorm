@@ -169,10 +169,21 @@ class Bot(models.Model):
         ('ERROR', 'Error'),
     )
 
+    BROKER_CHOICES = (
+    ('XTB', 'XTB Broker'),
+    ('BNB', 'Binance'),
+    ('D10', 'D510XTB'),
+    )
+    broker_type = models.CharField(
+        max_length=3,
+        choices=BROKER_CHOICES,
+        default='XTB'
+    )
+
+
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     instrument = models.CharField(max_length=50)
-    min_price = models.DecimalField(max_digits=10, decimal_places=2)
     max_price = models.DecimalField(max_digits=10, decimal_places=2)
     percent = models.IntegerField()
     capital = models.DecimalField(max_digits=12, decimal_places=2)
@@ -180,9 +191,11 @@ class Bot(models.Model):
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='NEW')
     created_at = models.DateTimeField(auto_now_add=True)
-
+    finished_at = models.DateTimeField(null=True, blank=True)  # Zaktualizowane pole
     # id bota w mikroserwisie
     microservice_bot_id = models.IntegerField(blank=True, null=True)
 
     def __str__(self):
         return f"Bot {self.name} (user={self.user}, {self.instrument}, {self.status})"
+
+

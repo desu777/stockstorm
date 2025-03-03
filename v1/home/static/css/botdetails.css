@@ -1,0 +1,132 @@
+/* Kontener */
+.bot-details-container {
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 2rem;
+    background-color: var(--c-gray-800);
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Nagłówek */
+.bot-details-container h2 {
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    text-align: center;
+    color: var(--c-green-500);
+}
+
+/* Wrapper dla szczegółów i tabeli */
+.bot-info-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 2rem;
+}
+
+/* Sekcja szczegółów */
+.bot-info-left {
+    flex: 1;
+    background-color: var(--c-gray-700);
+    padding: 1.5rem;
+    border-radius: 8px;
+    color: var(--c-text-primary);
+    font-size: 16px;
+}
+
+.bot-info-left p {
+    margin: 0.5rem 0;
+    font-size: 15px;
+}
+
+.bot-info-left p strong {
+    color: var(--c-green-500);
+}
+
+/* Tabela poziomów */
+.bot-info-right {
+    flex: 2;
+    max-width: 100%;
+}
+
+.levels-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.levels-table th,
+.levels-table td {
+    padding: 12px 15px;
+    text-align: center;
+    border: 1px solid var(--c-gray-600);
+}
+
+.levels-table th {
+    background-color: var(--c-gray-700);
+    color: var(--c-text-primary);
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.levels-table tr:nth-child(even) {
+    background-color: var(--c-gray-800);
+}
+
+.levels-table td {
+    color: var(--c-text-secondary);
+}
+
+.levels-table tr:hover {
+    background-color: var(--c-gray-600);
+}
+
+/* Całkowity zysk */
+.total-profit {
+    font-size: 18px;
+    font-weight: bold;
+    margin-top: 1rem;
+    color: var(--c-green-500);
+    text-align: left;
+}
+.profit-percentage{
+    font-size: 18px;
+    font-weight: bold;
+    margin-top: 1rem;
+    color: var(--c-green-500);
+    text-align: left;
+}
+
+/* Przycisk akcji */
+.action-button {
+    display: inline-block;
+    margin-top: 1rem;
+    padding: 10px 15px;
+    background-color: #dc3545;
+    color: var(--c-gray-100);
+    border: none;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+.action-button1 {
+    display: inline-block;
+    margin-top: 1rem;
+    padding: 10px 15px;
+    background-color: green;
+    color: var(--c-gray-100);
+    border: none;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.action-button:hover {
+    background-color: #b02a37;
+}
+

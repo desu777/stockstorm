@@ -1,5 +1,5 @@
 from django.db import models
-
+#api/models.py
 # Create your models here.
 from django.db import models
 import json
@@ -28,7 +28,6 @@ class MicroserviceBot(models.Model):
     user_id = models.IntegerField()
     name = models.CharField(max_length=100)
     instrument = models.CharField(max_length=50)
-    min_price = models.DecimalField(max_digits=10, decimal_places=2)
     max_price = models.DecimalField(max_digits=10, decimal_places=2)
     percent = models.IntegerField()
     capital = models.DecimalField(max_digits=12, decimal_places=2)

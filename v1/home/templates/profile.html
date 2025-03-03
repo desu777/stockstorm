@@ -1,8 +1,10 @@
 {% extends "base.html" %}
+{% load static %}
+
 
 {% block content %}
 <div class="profile-container">
-    <h2>User Profile</h2>
+    <h2>XTB connection</h2>
     <form method="post" class="profile-form">
         {% csrf_token %}
         
@@ -16,7 +18,7 @@
             {{ form.password }}
         </div>
         
-        <button type="submit" class="btn btn-primary">Save & Connect</button>
+        <button type="submit" class="btn-primary">Save & Connect</button>
     </form>
 
     {% if session_id %}
@@ -31,3 +33,4 @@
     {% endif %}
 </div>
 {% endblock %}
+

@@ -8,4 +8,7 @@ urlpatterns = [
     path('sync_session_id/', views.sync_session_id, name='sync_session_id'),
     path('get_bot_details/<int:bot_id>/', views.get_bot_details, name='get_bot_details'), 
     path('register_token/', views.register, name='register_token'),
+    path('get_bot_status/<int:bot_id>/', views.get_bot_status, name='get_bot_status'),
+    path('export_bot_trades_csv/<int:bot_id>/', views.export_bot_trades_csv, name='export_bot_trades_csv'),
+    path('check_xtb_connection/<int:bot_id>/', views.check_xtb_connection, name='check_xtb_connection'),
 ]

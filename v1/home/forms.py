@@ -26,7 +26,7 @@ class XTBConnectionForm(forms.ModelForm):
 
     class Meta:
         model = XTBConnection
-        fields = ['xtb_id']  # Pomijamy 'password', bo obsługujemy je ręcznie
+        fields = ['xtb_id']  
 
     def save(self, commit=True):
         # Przechwycenie zapisu, aby obsłużyć szyfrowanie hasła
@@ -45,7 +45,7 @@ class BotForm(forms.ModelForm):
         model = Bot
         fields = [
             'name', 'instrument',
-            'min_price', 'max_price',
+            'max_price',
             'percent', 'capital',
             'stream_session_id'
         ]

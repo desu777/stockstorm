@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-br7*sac60)7rpbb=78iwl60%!v#h4*t*+yd^hs@6&wn1_x*z!#
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['94.131.97.54', 'stockstorm.online', '127.0.0.1']
 
 
 # Application definition
@@ -51,6 +51,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'home.middleware.LiveStatusMiddleware',
+    'home.sync_bot_middleware.SyncBotMiddleware',
 ]
 
 ROOT_URLCONF = 'stockstorm_project.urls'
@@ -151,72 +152,9 @@ REST_FRAMEWORK = {
 
 MICROSERVICE_URL = "http://127.0.0.1:8001/create_bot/"
 MICROSERVICE_URL2 = "http://127.0.0.1:8005"
-
-TOKENS_FILE_PATH = Path.home() / 'Desktop' / 'microservice_tokens.txt'
-
-def load_tokens(filepath):
-    tokens = {}
-    try:
-        with open(filepath, 'r') as file:
-            for line in file:
-                if '=' in line:
-                    key, value = line.strip().split('=', 1)
-                    tokens[key] = value
-    except FileNotFoundError:
-        print(f"[ERROR] Plik {filepath} nie został znaleziony!")
-    except Exception as e:
-        print(f"[ERROR] Błąd podczas odczytu tokenów: {e}")
-    return tokens
-
-# Wczytaj tokeny
-tokens = load_tokens(TOKENS_FILE_PATH)
-
-# Przypisz tokeny do zmiennych Django
-MICROSERVICE_API_TOKEN = tokens.get('MICROSERVICE_API_TOKEN', '')
-MICROSERVICE_API_TOKEN2 = tokens.get('MICROSERVICE_API_TOKEN2', '')
+BNB_MICROSERVICE_URL="http://127.0.0.1:8006"
+XTB_D ="http://127.0.0.1:8004"
 
 
 
-# Adres RabbitMQ jako brokera
-CELERY_BROKER_URL = 'amqp://guest:guest@localhost:5672//'
 
-# Backend wyników wyłączony (jeśli nie potrzebujesz wyników)
-CELERY_RESULT_BACKEND = None
-
-# Akceptowane formaty danych
-CELERY_ACCEPT_CONTENT = ['json']
-
-# Serializacja zadań
-CELERY_TASK_SERIALIZER = 'json'
-
-# Strefa czasowa Celery
-CELERY_TIMEZONE = 'UTC'
-CELERY_ENABLE_UTC = True
-
-# Śledzenie rozpoczętych zadań
-CELERY_TASK_TRACK_STARTED = True
-
-# Limit czasu dla zadania (opcjonalne, np. 30 minut)
-CELERY_TASK_TIME_LIMIT = 30 * 60
-
-# Limit czasu dla twardego zakończenia zadania (jeśli miękki limit nie zadziała)
-CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60
-
-# Maksymalna liczba powtórzeń zadania (opcjonalne)
-CELERY_TASK_REJECT_ON_WORKER_LOST = True
-
-# Logowanie zadań
-CELERY_WORKER_LOG_FORMAT = "[%(asctime)s: %(levelname)s/%(processName)s] %(message)s"
-CELERY_WORKER_REDIRECT_STDOUTS_LEVEL = 'DEBUG'
-
-# Konfiguracja Celery Beat (Harmonogram zadań)
-CELERY_BEAT_SCHEDULE = {
-    'ping-xtb-every-10-seconds': {
-        'task': 'home.tasks.ping_xtb',
-        'schedule': 10.0,  # Co 10 sekund
-    },
-    'sync-xtb-session-ids-every-10-seconds': {
-        'task': 'home.tasks.sync_xtb_session_ids',
-        'schedule': 10.0,  # Co 10 sekund
-    },
-}

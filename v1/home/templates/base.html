@@ -2,59 +2,152 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
+  <!-- Tytuł strony może być też blokiem, jeśli chcesz go modyfikować w podszablonach -->
   <title>{% block title %}Admin Dashboard | STOCKstorm{% endblock %}</title>
-  <link rel="stylesheet" href="{% static 'css/base.css' %}" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css" />
+
+  <!-- Reset CSS (z nowego szablonu) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css">
+
+  <!-- Nowy plik CSS -->
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  
+  <link rel="stylesheet" href="{% static 'css/profile.css' %}">
+  <link rel="stylesheet" href="{% static 'css/list.css' %}">
+  <link rel="stylesheet" href="{% static 'css/botdetails.css' %}">
+  
+
+
+  <!-- Phosphor Icons (z nowego szablonu) -->
+  <link rel="stylesheet" href="https://unpkg.com/phosphor-icons">
+
+  <!-- Font Awesome i Material Design Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/material-design-iconic-font@2.2.0/dist/css/material-design-iconic-font.min.css">
 </head>
 <body>
-  <script src="{% static 'js/dashboard.js' %}"></script>
-  <header class="header">
-    <div class="logo">
-      <a href="#">STOCKstorm</a>
-    </div>
-    <div class="utc-time">
-      <i class="fas fa-clock"></i> <span id="utc-time">Loading...</span>
-    </div>
-    <div class="header-icons">
-        <div class="status">
-          {% if request.is_live %}
-          <i class="fas fa-circle" style="color: green;"></i> LIVE
-            {% else %}
-            <i class="fas fa-circle" style="color: red;"></i> OFFLINE
-          {% endif %}
+  <!-- Struktura Dashboardu -->
+  <div class="app">
+    <header class="app-header">
+      <div class="app-header-logo">
+        <div class="logo">
+          <span class="logo-icon">
+            <i class="zmdi zmdi-landscape"></i>
+          </span>
+          <h1 class="logo-title">
+            <span>STOCKstorm</span>
+          </h1>
         </div>
-        <form action="{% url 'logout' %}" method="POST" style="display: inline;">
-            {% csrf_token %}
-            <button type="submit" title="Logout" style="background: none; border: none; cursor: pointer;">
-                <i class="fas fa-sign-out-alt logout-icon"></i>
-            </button>
-        </form>
-        <i class="fas fa-bell"></i>
-        <div class="account">
-            <img src="{% static 'images/ava.jpg' %}" alt="Profile Image">
-            <h4>{{ user.username }}</h4>
-        </div>
-    </div>
-  </header>
-
-  <div class="container">
-    <nav>
-      <div class="side_navbar">
-        <span>Main Menu</span>
-        <a href="{% url 'dashboard' %}" class="active">Dashboard</a>
-        <a href="{% url 'profile' %}">Profile</a>
-        <a href="{% url 'history' %}">History</a>
-        <a href="{% url 'show_symbols' %}"> Tickers</a>
-        <a href="{% url 'bot_list' %}">51015</a>
       </div>
-    </nav>
+      
+      <div class="app-header-navigation">
+        <div class="tabs">
+          <a href="{% url 'dashboard' %}" class="active">Overview</a>
+          <a href="{% url 'profile' %}">Profile</a>
+          <a href="{% url 'history' %}">About</a>
+          <a href="{% url 'show_symbols' %}">TickersXTB</a>
+        </div>
+      </div>
 
-    <div class="main-body">
-      {% block content %}
-      <!-- Page-specific content will go here -->
-      {% endblock %}
-    </div>
-  </div>
+      <div class="app-header-actions">
+        <!-- Kontener profilu użytkownika wraz z wylogowaniem -->
+        <div class="user-profile">
+          <span>{{ user.username }}</span>
+          <span>
+            <img src="{% static 'images/ava.jpg' %}" alt="Profile Image" />
+          </span>
+        </div>
+        
+        <!-- Przycisk wylogowania zamiast lupy -->
+        <div class="app-header-actions-buttons">
+          <form action="{% url 'logout' %}" method="POST" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" title="Logout" class="icon-button large logout-button">
+              <i class="fas fa-sign-out-alt logout-icon"></i>
+            </button>
+          </form>
+          <button class="icon-button large">
+            <i class="ph-bell"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="app-header-mobile">
+        <button class="icon-button large">
+          <i class="ph-list"></i>
+        </button>
+      </div>
+    </header>
+
+    <div class="app-body">
+      <div class="app-body-navigation">
+        <nav class="navigation">
+          <a href="{% url 'dashboard' %}">
+            <i class="ph-browsers"></i>
+            <span>Dashboard</span>
+          </a>
+          <a href="{% url 'history' %}">
+            <i class="ph-check-square"></i>
+            <span>About</span>
+          </a>
+          <a href="{% url 'show_symbols' %}">
+            <i class="ph-swap"></i>
+            <span>TickersXTB</span>
+          </a>
+          <a href="{% url 'profile' %}">
+            <i class="ph-file-text"></i>
+            <span>Profile</span>
+          </a>
+          <a href="{% url 'bot_list' %}">
+            <i class="ph-globe"></i>
+            <span>XTB51015rei</span>
+          </a>
+          <a href="{% url 'bnb_list' %}">
+            <i class="ph-globe"></i>
+            <span>BNB51015rei</span>
+          </a>
+          <a href="{% url 'd10_list' %}">
+            <i class="ph-globe"></i>
+            <span>D10</span>
+          </a>
+        </nav>
+        <footer class="footer">
+          <h1>STOCKstorm<small>©</small></h1>
+          <div>
+            STOCKstorm ©<br />
+            All Rights Reserved 2025
+          </div>
+        </footer>
+      </div>
+
+      <!-- Główna zawartość (pozostawiamy pusty blok content) -->
+      <div class="app-body-main-content">
+        {% block content %}
+        {% endblock %}
+      </div>
+
+      
+
+  <!-- Skrypty -->
+  <script src="https://unpkg.com/phosphor-icons"></script>
+  <!-- Jeśli potrzebujesz starego JS (z poprzedniego layoutu) -->
+  <script src="{% static 'js/dashboard.js' %}"></script>
+  <!-- Nowy plik JS -->
+  <script src="{% static 'js/script.js' %}"></script>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const mobileMenuButton = document.querySelector('.app-header-mobile .icon-button');
+      const sideNav = document.querySelector('.app-body-navigation');
+  
+      if (mobileMenuButton && sideNav) {
+        mobileMenuButton.addEventListener('click', () => {
+          sideNav.classList.toggle('active');
+        });
+      }
+    });
+  </script>
+  
+
 </body>
 </html>

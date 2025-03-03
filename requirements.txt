@@ -1,6 +1,5 @@
 celery
 websockets
-python3-dev
 default-libmysqlclient-dev
 build-essential
 pkg-config
@@ -11,4 +10,5 @@ cryptography>=41.0.4
 djangorestframework>=3.14.0
 djangorestframework-simplejwt>=5.3.0
 requests>=2.31.0  # Wysyłanie żądań HTTP (potrzebne do komunikacji z mikroserwisem)
-python-dotenv>=1.0.0  # Wczytywanie zmiennych środowiskowych (opcjonalne)
+python-dotenv>=1.0.0  # Wczytywanie zmiennych środowiskowych (opcjonalne
+python-binance

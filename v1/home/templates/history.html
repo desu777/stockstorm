@@ -1,49 +1,36 @@
 {% extends "base.html" %}
 
-{% block content %}
-<h1>Transaction History</h1>
-<script>
-    // Automatyczne odświeżanie co minutę
-    setInterval(() => {
-        location.reload();
-    }, 60000); // 60000 ms = 1 minuta
-</script>
-<form method="get" style="margin-bottom: 1rem;">
-    <button type="submit" style="padding: 8px 12px; background: #007bff; color: #fff; border: none; border-radius: 5px;">Odśwież Historię</button>
-</form>
+{% load static %}
 
-<table>
-    <thead>
-        <tr>
-            <th>#</th>
-            <th>Date</th>
-            <th>Type</th>
-            <th>Instrument</th>
-            <th>Amount</th>
-            <th>Profit/Loss</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for trade in history %}
-        <tr>
-            <td>{{ forloop.counter }}</td>
-            <td>{{ trade.close_time|date:"Y-m-d H:i" }}</td>
-            <td>{{ trade.type }}</td>
-            <td>{{ trade.instrument }}</td>
-            <td>{{ trade.amount }}</td>
-            <td>
-                {% if trade.profit > 0 %}
-                    <span style="color: green;">+{{ trade.profit }}</span>
-                {% else %}
-                    <span style="color: red;">{{ trade.profit }}</span>
-                {% endif %}
-            </td>
-        </tr>
-        {% empty %}
-        <tr>
-            <td colspan="6" style="text-align:center;">No transactions available.</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-{% endblock %}
+{% block content %}
+
+<!-- Sekcja opisu platformy Stockstorm -->
+<section style="margin-top: 2rem; padding: 1rem; background: #222; border-radius: 5px;">
+    <h1>Stockstorm — Czym jest?</h1>
+    <p>
+        Platforma tradingowa umożliwiająca handel zarówno na giełdzie tradycyjnej, 
+        jak i kryptowalut, opierająca się na osobistych, opracowanych strategiach.
+    </p>
+
+    <h2>Jak używać?</h2>
+    <ul style="list-style-type: disc; margin-left: 2rem;">
+        <li>Aktualnie dostępne są dwa serwisy botów tradingowych.</li>
+        <li>Ważne jest, aby zadbać o wystarczający kapitał na koncie tradingowym.</li>
+        <li>Przed uruchomieniem bota sprawdź poprawność nazwy aktywa (instrumentu).</li>
+        <li>Wartość aktywa wpisujemy po kropce. Cena 13.42 przykład.</li>
+        <li><strong>Max price</strong> należy uzupełnić o właściwą wartość także po kropce, a w polu decimal wybrać ile liczb jest po niej. </li>
+        <li>Możesz sprawdzić połączenie z kontem. Jeśli wystąpi błąd 404, usuń bota i utwórz nowego.</li>
+    </ul>
+
+    <h2>Jeśli masz problem skontaktuj się na discord: desu_77</h2>
+</section>
+<!-- NOWY KONTENER Z GIFEM -->
+<div class="gif-container">
+    <img 
+      src="{% static 'images/pudgy2.gif' %}" 
+      alt="Pudgy GIF" 
+      class="centered-gif" 
+    />
+  </div>
+{% endblock content %}
+

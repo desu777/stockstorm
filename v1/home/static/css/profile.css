@@ -1,0 +1,89 @@
+/* Stylizacja kontenera formularza */
+.profile-container {
+    max-width: 500px;
+    margin: 2rem auto;
+    padding: 2rem;
+    background-color: #2e2e2e;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    color: var(--c-text-primary);
+}
+
+/* Tytuł formularza */
+.profile-container h2 {
+    margin-bottom: 20px;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--c-green-500);
+    text-align: center;
+    text-transform: uppercase;
+}
+
+/* Pola formularza */
+.profile-form .form-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.profile-form .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--c-gray-300);
+}
+
+.profile-form .form-group input[type="text"],
+.profile-form .form-group input[type="password"] {
+    width: 100%;
+    padding: 12px;
+    font-size: 14px;
+    border: 1px solid var(--c-gray-600);
+    border-radius: 6px;
+    background-color: var(--c-gray-800);
+    color: var(--c-text-primary);
+    transition: border-color 0.3s ease;
+}
+
+.profile-form .form-group input[type="text"]:focus,
+.profile-form .form-group input[type="password"]:focus {
+    border-color: var(--c-green-500);
+    outline: none;
+    box-shadow: 0 0 5px var(--c-green-500);
+}
+
+/* Przycisk formularza */
+.profile-form .btn-primary {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    font-weight: bold;
+    text-transform: uppercase;
+    background-color: var(--c-green-500);
+    color: var(--c-gray-900);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.profile-form .btn-primary:hover {
+    background-color: var(--c-olive-500);
+    transform: translateY(-3px);
+}
+
+/* Informacje o sesji */
+.session-info {
+    margin-top: 20px;
+    padding: 1rem;
+    background-color: var(--c-gray-700);
+    border-radius: 8px;
+    text-align: center;
+    color: var(--c-text-secondary);
+}
+
+.session-info h4 {
+    margin-bottom: 10px;
+    font-size: 18px;
+    color: var(--c-green-500);
+}

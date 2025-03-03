@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}
+  BNB Bot List | STOCKstorm
+{% endblock %}
+
+{% block content %}
+<div class="bot-container">
+  <h2>Your BNB Bots</h2>
+  
+  <!-- Przycisk dodania nowego bota -->
+  <a href="{% url 'bnb_create' %}" class="add-bot-button">Add new BNB Bot</a>
+
+  <!-- Tabela z botami -->
+  <table class="bot-table">
+    <thead>
+      <tr>
+        <th>Local ID</th>
+        <th>Name</th>
+        <th>Symbol</th>
+        <th>Status</th>
+        <th>Capital</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for bot in bots %}
+      <tr id="bot-row-{{ bot.id }}">
+        <td>{{ bot.id }}</td>
+        <td>{{ bot.name }}</td>
+        <td>{{ bot.instrument }}</td>
+        <td class="bot-status" data-bot-id="{{ bot.id }}">{{ bot.status }}</td>
+        <td>{{ bot.capital }}</td>
+        <td class="bot-actions">
+          <!-- Szczegóły bota -->
+          <a href="{% url 'bnb_detail' bot.id %}">Details</a>
+          <!-- Usuń / zatrzymaj bota -->
+          <form action="{% url 'bnb_delete' bot.id %}" method="post" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="bot-table-empty">No bots to display.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const statusElements = document.querySelectorAll('.bot-status');
+    statusElements.forEach(function(element) {
+      const botId = element.getAttribute('data-bot-id');
+      // Zakładam, że masz endpoint do pobierania statusu bota
+      fetch(`/bnb/${botId}/status/`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.status) {
+            element.textContent = data.status;
+          } else if (data.error) {
+            console.error(`Error fetching status for bot ${botId}: ${data.error}`);
+          }
+        })
+        .catch(error => {
+          console.error(`Fetch error for bot ${botId}:`, error);
+        });
+    });
+  });
+</script>
+{% endblock %}

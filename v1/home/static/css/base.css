@@ -416,3 +416,40 @@ table td{
     font-size: 12px;
   }
 }
+
+.utc-time-container {
+  margin-top: 5rem;
+  text-align: center;
+  font-size: 2rem;
+  font-weight: bold;
+  color: #007bff; /* Dodanie koloru */
+  background: rgba(0, 0, 0, 0.05); /* Lekki szary panel */
+  padding: 1rem;
+  border-radius: 8px;
+  display: inline-block; /* Dopasowanie do szerokości tekstu */
+}
+
+.xtb-status-container {
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.xtb-status-indicator {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-left: 0.5rem;
+  border-radius: 50%;
+  background-color: red; /* Domyślnie czerwone */
+}
+
+.xtb-status-indicator.live {
+  background-color: green;
+}
+
+.xtb-status-indicator.offline {
+  background-color: red;
+}
+

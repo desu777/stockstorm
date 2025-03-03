@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}
+  Dodaj D10 Bot | STOCKstorm
+{% endblock %}
+
+{% block content %}
+<div class="profile-container" style="max-width: 600px;">
+    <h2>Add new D10 Bot</h2>
+    <form method="post" class="profile-form" style="text-align:left;">
+        {% csrf_token %}
+
+        <!-- Nazwa bota -->
+        <div class="form-group">
+            <label for="id_name">Bot name:</label>
+            <input type="text" name="name" id="id_name" required>
+        </div>
+        
+        <!-- Instrument -->
+        <div class="form-group">
+            <label for="id_instrument">Instrument (np. US500, EURUSD):</label>
+            <input type="text" name="instrument" id="id_instrument" required>
+        </div>
+
+        <!-- Waluta aktywa -->
+        <div class="form-group">
+            <label for="id_asset_currency">Asset currency:</label>
+            <select name="asset_currency" id="id_asset_currency" required>
+                <option value="PLN">PLN</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+            </select>
+        </div>
+
+        <!-- Band Percent -->
+        <div class="form-group">
+            <label for="id_band_percent">Band Percent (np. 30):</label>
+            <input type="number" step="0.01" name="band_percent" id="id_band_percent" required>
+        </div>
+
+        <!-- Step Percent -->
+        <div class="form-group">
+            <label for="id_step_percent">Step Percent (np. 5):</label>
+            <input type="number" step="0.01" name="step_percent" id="id_step_percent" required>
+        </div>
+
+        <!-- Rise Percent -->
+        <div class="form-group">
+            <label for="id_rise_percent">Rise Percent (np. 10):</label>
+            <input type="number" step="0.01" name="rise_percent" id="id_rise_percent" required>
+        </div>
+
+        <!-- Kapitał -->
+        <div class="form-group">
+            <label for="id_capital">Capital for bot:</label>
+            <input type="number" step="0.01" name="capital" id="id_capital" required>
+        </div>
+
+        <!-- Waluta konta -->
+        <div class="form-group">
+            <label for="id_account_currency">Account currency:</label>
+            <select name="account_currency" id="id_account_currency" required>
+                <option value="PLN">PLN</option>
+                <option value="USD">USD</option>
+            </select>
+        </div>
+
+        <!-- XTB ID -->
+        <div class="form-group">
+            <label for="id_xtb_id">XTB ID:</label>
+            <input type="text" name="xtb_id" id="id_xtb_id" required>
+        </div>
+
+        <!-- XTB Password -->
+        <div class="form-group">
+            <label for="id_xtb_password">XTB Password:</label>
+            <input type="password" name="xtb_password" id="id_xtb_password" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Create Bot</button>
+    </form>
+</div>
+{% endblock %}

@@ -115,6 +115,7 @@ class XTBConnectionManager:
             self.disconnect(user_id)
             return None
 
+
 # Automatyczne pingowanie w tle
 def start_ping_thread():
     manager = XTBConnectionManager()

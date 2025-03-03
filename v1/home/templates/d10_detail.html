@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}
+  Bot details | STOCKstorm
+{% endblock %}
+
+{% block content %}
+<div class="bot-details-container">
+  <!-- Nagłówek -->
+  <h2>Bot Details: {{ bot.name }}</h2>
+
+  <!-- Sekcja szczegółów bota -->
+  <div class="bot-info-wrapper">
+    <div class="bot-info-left">
+      <p><strong>Asset:</strong> {{ bot.instrument }}</p>
+      <p><strong>Status:</strong> {{ bot.status }}</p>
+      <p><strong>Band Price:</strong> {{ bot.max_price }}</p>
+      <p><strong>Step Percent:</strong> {{ bot.percent }}%</p>
+      <p><strong>Capital:</strong> {{ bot.capital }}</p>
+      <p><strong>Created At:</strong> {{ bot.created_at }}</p>
+      <p><strong>Finished At:</strong> {{bot.finished_at}}</p>
+      
+      <!-- Całkowity Zysk -->
+      <h3>Całkowity Zysk</h3>
+      <p class="total-profit" id="total-profit">{{ d10_details.total_profit }}</p>
+      
+      <!-- Zysk % na Kapitale -->
+      <h3>Zysk % na Kapitale</h3>
+      <p class="profit-percentage" id="profit-percentage">-</p>
+    </div>
+
+    <!-- Tabela poziomów handlowych -->
+    <div class="bot-info-right">
+      <h3>Poziomy Handlowe</h3>
+      <table class="levels-table">
+        <thead>
+          <tr>
+            <th>Level</th>
+            <th>Cena</th>
+            <th>Kapitał</th>
+            <th>Liczba TP</th>
+            <th>Zysk</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lv, details in d10_details.levels.items %}
+          <tr id="level-{{ lv }}">
+            <td>{{ lv }}</td>
+            <td id="{{ lv }}-price">{{ details.price }}</td>
+            <td id="{{ lv }}-capital">{{ details.capital }}</td>
+            <td id="{{ lv }}-tp">{{ details.tp }}</td>
+            <td id="{{ lv }}-profit">{{ details.profit }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div style="text-align: center; margin-top: 2rem;">
+    <!-- Przycisk pobrania CSV -->
+    <form action="{% url 'export_d10_trades' bot.id %}" method="GET" style="display: inline;">
+      <button type="submit" class="action-button1">
+        Pobierz transakcje do CSV
+      </button>
+    </form>
+    <button id="btnCheckConn" class="action-button1">Sprawdź połączenie z XTB</button>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script>
+    $("#btnCheckConn").click(function(e){
+      e.preventDefault();
+
+      $.ajax({
+        url: "{% url 'check_d10_connection' bot.id %}",
+        method: "GET",
+        success: function(resp) {
+          if(resp.ok) {
+            alert("OK: " + resp.message);
+          } else {
+            alert("Błąd: " + resp.message);
+          }
+        },
+        error: function(xhr) {
+          alert("Błąd AJAX: " + xhr.status + " " + xhr.statusText);
+        }
+      });
+    });
+  </script>
+  
+    <!-- (Opcjonalnie) Drugi przycisk do czegoś innego -->
+    <!-- <button type="button" class="action-button">Inna akcja</button> -->
+  </div>
+
+  <!-- Przycisk zatrzymania bota -->
+  {% if bot.status != "FINISHED" %}
+  <form action="{% url 'd10_remove' bot.id %}" method="post" style="text-align: center; margin-top: 2rem;">
+    {% csrf_token %}
+    <button type="submit" class="action-button">Zatrzymaj/Usuń bota</button>
+  </form>
+  {% endif %}
+</div>
+
+<!-- JavaScript -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+  const apiEndpoint = "{% url 'get_bot_details_proxy' bot.id %}";
+
+  function updateBotDetails() {
+    $.ajax({
+      url: apiEndpoint,
+      method: 'GET',
+      success: function(data) {
+        if (data.error) {
+          console.error(data.error);
+          alert("Nie udało się pobrać danych bota. Spróbuj ponownie później.");
+          return;
+        }
+
+        let totalProfit = 0;
+
+        // Aktualizacja danych dla każdego poziomu
+        for (const [lv, details] of Object.entries(data.levels)) {
+          $(`#${lv}-price`).text(details.price.toFixed(2));
+          $(`#${lv}-capital`).text(details.capital.toFixed(2));
+          $(`#${lv}-tp`).text(details.tp);
+          $(`#${lv}-profit`).text(details.profit.toFixed(2));
+
+          totalProfit += parseFloat(details.profit);
+        }
+
+        // Aktualizacja całkowitego zysku
+        $("#total-profit").text(totalProfit.toFixed(2));
+
+        // Pobranie kapitału bota
+        const capital = parseFloat(data.capital);
+        if (!isNaN(capital) && capital !== 0) {
+          // Obliczenie zysku procentowego na kapitale
+          const profitPercentage = (totalProfit / capital) * 100;
+          $("#profit-percentage").text(profitPercentage.toFixed(2) + "%");
+        } else {
+          $("#profit-percentage").text("N/A");
+        }
+      },
+      error: function(xhr, status, error) {
+        console.error("Błąd podczas pobierania danych bota:", error);
+        alert("Wystąpił błąd podczas pobierania danych. Spróbuj ponownie później.");
+      }
+    });
+  }
+
+  // Aktualizacja co 5 sekund
+  setInterval(updateBotDetails, 5000);
+  $(document).ready(updateBotDetails);
+</script>
+{% endblock %}
+
