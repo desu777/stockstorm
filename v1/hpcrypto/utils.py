@@ -1,4 +1,4 @@
-# Add this to hpcrypto/utils.py
+# hpcrypto/utils.py
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
 from django.core.cache import cache

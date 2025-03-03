@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {{ position.ticker }} Details | STOCKstorm
+{% endblock %}
+
+{% block content %}
+<div class="app-body-main-content">
+    <div class="position-detail-header">
+        <h2>{{ position.ticker }} Position Details</h2>
+        <div class="position-actions">
+            <a href="{% url 'edit_position' position.id %}" class="btn btn-primary">Edit</a>
+            <a href="{% url 'add_alert' position.id %}" class="btn btn-warning">Add Alert</a>
+            <a href="{% url 'delete_position' position.id %}" class="btn btn-danger">Delete</a>
+            <a href="{% url 'position_list' %}" class="btn btn-secondary">Back to List</a>
+        </div>
+    </div>
+    
+    <div class="position-detail-container">
+        <div class="position-info-card">
+            <h3>Position Information</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="label">Category:</span>
+                    <span class="value">{{ position.category.name }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Ticker:</span>
+                    <span class="value">{{ position.ticker }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Quantity:</span>
+                    <span class="value">{{ position.quantity }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Entry Price:</span>
+                    <span class="value">${{ position.entry_price|floatformat:8 }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Current Price:</span>
+                    <span class="value">
+                        {% if position.current_price %}
+                            ${{ position.current_price|floatformat:8 }}
+                            <small>({{ position.last_price_update|timesince }} ago)</small>
+                        {% else %}
+                            Not available
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Exit Price:</span>
+                    <span class="value">
+                        {% if position.exit_price %}
+                            ${{ position.exit_price|floatformat:8 }}
+                        {% else %}
+                            Not set
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Position Size:</span>
+                    <span class="value">${{ position.position_size|floatformat:2 }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">P&L ($):</span>
+                    <span class="value {% if position.profit_loss_dollar >= 0 %}profit{% else %}loss{% endif %}">
+                        {% if position.profit_loss_dollar %}
+                            ${{ position.profit_loss_dollar|floatformat:2 }}
+                        {% else %}
+                            --
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="info-item">
+                    <span class="label">P&L (%):</span>
+                    <span class="value {% if position.profit_loss_percent >= 0 %}profit{% else %}loss{% endif %}">
+                        {% if position.profit_loss_percent %}
+                            {{ position.profit_loss_percent|floatformat:2 }}%
+                        {% else %}
+                            --
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Created:</span>
+                    <span class="value">{{ position.created_at }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Last Updated:</span>
+                    <span class="value">{{ position.updated_at }}</span>
+                </div>
+            </div>
+            
+            {% if position.notes %}
+                <div class="notes-section">
+                    <h4>Notes:</h4>
+                    <p>{{ position.notes|linebreaks }}</p>
+                </div>
+            {% endif %}
+        </div>
+        
+        <div class="alerts-card">
+            <div class="card-header">
+                <h3>Price Alerts</h3>
+                <a href="{% url 'add_alert' position.id %}" class="btn btn-sm btn-warning">Add Alert</a>
+            </div>
+            
+            {% if alerts %}
+                <table class="alerts-table">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Threshold</th>
+                            <th>Status</th>
+                            <th>Last Triggered</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for alert in alerts %}
+                            <tr>
+                                <td>{{ alert.get_alert_type_display }}</td>
+                                <td>
+                                    {% if alert.alert_type == 'PRICE_ABOVE' or alert.alert_type == 'PRICE_BELOW' %}
+                                        ${{ alert.threshold_value|floatformat:4 }}
+                                    {% else %}
+                                        {{ alert.threshold_value|floatformat:2 }}%
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if alert.triggered %}
+                                        <span class="alert-triggered">Triggered</span>
+                                    {% elif alert.is_active %}
+                                        <span class="alert-active">Active</span>
+                                    {% else %}
+                                        <span class="alert-inactive">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if alert.last_triggered %}
+                                        {{ alert.last_triggered }}
+                                    {% else %}
+                                        --
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="no-alerts">No alerts configured for this position.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.position-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.position-detail-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.position-info-card, .alerts-card {
+    background-color: #2a2a2a;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.label {
+    font-size: 12px;
+    color: #aaa;
+    margin-bottom: 5px;
+}
+
+.value {
+    font-size: 16px;
+}
+
+.profit {
+    color: #4caf50;
+}
+
+.loss {
+    color: #f44336;
+}
+
+.notes-section {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #444;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.alerts-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.alerts-table th, .alerts-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #444;
+}
+
+.alert-triggered {
+    color: #f44336;
+}
+
+.alert-active {
+    color: #4caf50;
+}
+
+.alert-inactive {
+    color: #888;
+}
+
+.no-alerts {
+    text-align: center;
+    padding: 20px;
+    color: #888;
+}
+
+@media (max-width: 768px) {
+    .position-detail-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .position-detail-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .position-actions {
+        margin-top: 10px;
+    }
+    
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}

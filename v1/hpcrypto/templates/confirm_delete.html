@@ -1,0 +1,81 @@
+<!-- confirm_delete.html -->
+{% extends "base.html" %}
+
+{% block title %}
+    {{ title }} | STOCKstorm
+{% endblock %}
+
+{% block content %}
+<div class="app-body-main-content">
+    <h2>{{ title }}</h2>
+    
+    <div class="confirm-delete-container">
+        <div class="warning-message">
+            <i class="fa fa-exclamation-triangle warning-icon"></i>
+            <p>{{ message }}</p>
+        </div>
+        
+        <div class="object-info">
+            {% if object.ticker %}
+                <!-- Position object -->
+                <p><strong>Ticker:</strong> {{ object.ticker }}</p>
+                <p><strong>Quantity:</strong> {{ object.quantity }}</p>
+                <p><strong>Entry Price:</strong> ${{ object.entry_price|floatformat:4 }}</p>
+            {% else %}
+                <!-- Category object -->
+                <p><strong>Name:</strong> {{ object.name }}</p>
+                <p><strong>Positions:</strong> {{ object.positions.count }}</p>
+            {% endif %}
+        </div>
+        
+        <div class="action-buttons">
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Confirm Delete</button>
+            </form>
+            
+            {% if object.ticker %}
+                <a href="{% url 'position_detail' object.id %}" class="btn btn-secondary">Cancel</a>
+            {% else %}
+                <a href="{% url 'position_list' %}" class="btn btn-secondary">Cancel</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.confirm-delete-container {
+    background-color: #2a2a2a;
+    border-radius: 8px;
+    padding: 20px;
+    max-width: 600px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.warning-message {
+    margin-bottom: 20px;
+    color: #f44336;
+}
+
+.warning-icon {
+    font-size: 48px;
+    margin-bottom: 10px;
+}
+
+.object-info {
+    margin: 20px 0;
+    text-align: left;
+    padding: 15px;
+    background-color: #333;
+    border-radius: 4px;
+}
+
+.action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+}
+</style>
+{% endblock %}

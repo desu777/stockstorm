@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+
+{% block title %}
+    HP Crypto Positions | STOCKstorm
+{% endblock %}
+
+{% block content %}
+<div class="app-body-main-content">
+    <h2>HP Crypto Positions</h2>
+    
+    <div class="action-buttons">
+        <a href="{% url 'add_category' %}" class="btn btn-primary">Add HP Category</a>
+        <a href="{% url 'add_position' %}" class="btn btn-success">Add Position</a>
+        <button id="update-prices" class="btn btn-info">Update Prices</button>
+    </div>
+    
+    <div id="alerts-container" class="alerts-container" style="display: none;">
+        <h3>Triggered Alerts</h3>
+        <ul id="alerts-list" class="alerts-list"></ul>
+    </div>
+    
+    {% if not categories %}
+        <div class="empty-state">
+            <p>No positions tracked yet. Get started by creating a category and adding positions.</p>
+        </div>
+    {% else %}
+        <div class="hp-categories">
+            {% for category in categories %}
+                <div class="hp-category">
+                    <div class="category-header" data-target="category-{{ category.id }}">
+                        <h3>{{ category.name }}</h3>
+                        <div class="category-summary">
+                            <span>Total Investment: ${{ category.total_investment|floatformat:2 }}</span>
+                            <span class="{% if category.total_pnl_dollar >= 0 %}profit{% else %}loss{% endif %}">
+                                P&L: ${{ category.total_pnl_dollar|floatformat:2 }} ({{ category.total_pnl_percent|floatformat:2 }}%)
+                            </span>
+                        </div>
+                        <div class="category-actions">
+                            <a href="{% url 'edit_category' category.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <a href="{% url 'delete_category' category.id %}" class="btn btn-sm btn-outline-danger">Delete</a>
+                            <i class="toggle-icon fa fa-chevron-down"></i>
+                        </div>
+                    </div>
+                    
+                    <div id="category-{{ category.id }}" class="category-content">
+                        {% if category.positions.exists %}
+                            <table class="position-table">
+                                <thead>
+                                    <tr>
+                                        <th>Ticker</th>
+                                        <th>Quantity</th>
+                                        <th>Entry Price</th>
+                                        <th>Current Price</th>
+                                        <th>Exit Price</th>
+                                        <th>P&L $</th>
+                                        <th>P&L %</th>
+                                        <th>Position Size</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for position in category.positions.all %}
+                                        <tr data-position-id="{{ position.id }}">
+                                            <td>{{ position.ticker }}</td>
+                                            <td>{{ position.quantity }}</td>
+                                            <td>${{ position.entry_price|floatformat:4 }}</td>
+                                            <td class="current-price">
+                                                {% if position.current_price %}
+                                                    ${{ position.current_price|floatformat:4 }}
+                                                    <small>{{ position.last_price_update|timesince }} ago</small>
+                                                {% else %}
+                                                    --
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if position.exit_price %}
+                                                    ${{ position.exit_price|floatformat:4 }}
+                                                {% else %}
+                                                    --
+                                                {% endif %}
+                                            </td>
+                                            <td class="pnl-dollar {% if position.profit_loss_dollar >= 0 %}profit{% else %}loss{% endif %}">
+                                                {% if position.profit_loss_dollar %}
+                                                    ${{ position.profit_loss_dollar|floatformat:2 }}
+                                                {% else %}
+                                                    --
+                                                {% endif %}
+                                            </td>
+                                            <td class="pnl-percent {% if position.profit_loss_percent >= 0 %}profit{% else %}loss{% endif %}">
+                                                {% if position.profit_loss_percent %}
+                                                    {{ position.profit_loss_percent|floatformat:2 }}%
+                                                {% else %}
+                                                    --
+                                                {% endif %}
+                                            </td>
+                                            <td>${{ position.position_size|floatformat:2 }}</td>
+                                            <td class="actions">
+                                                <a href="{% url 'position_detail' position.id %}" title="View Details" class="btn btn-sm btn-info">
+                                                    <i class="fa fa-eye"></i>
+                                                </a>
+                                                <a href="{% url 'edit_position' position.id %}" title="Edit" class="btn btn-sm btn-primary">
+                                                    <i class="fa fa-edit"></i>
+                                                </a>
+                                                <a href="{% url 'delete_position' position.id %}" title="Delete" class="btn btn-sm btn-danger">
+                                                    <i class="fa fa-trash"></i>
+                                                </a>
+                                                <a href="{% url 'add_alert' position.id %}" title="Add Alert" class="btn btn-sm btn-warning">
+                                                    <i class="fa fa-bell"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <p class="empty-category">No positions in this category yet.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle category content
+    const categoryHeaders = document.querySelectorAll('.category-header');
+    categoryHeaders.forEach(header => {
+        header.addEventListener('click', function() {
+            const targetId = this.getAttribute('data-target');
+            const content = document.getElementById(targetId);
+            
+            if (content.style.display === 'none' || content.style.display === '') {
+                content.style.display = 'block';
+                this.querySelector('.toggle-icon').classList.replace('fa-chevron-down', 'fa-chevron-up');
+            } else {
+                content.style.display = 'none';
+                this.querySelector('.toggle-icon').classList.replace('fa-chevron-up', 'fa-chevron-down');
+            }
+        });
+    });
+    
+    // Update prices button
+    const updateBtn = document.getElementById('update-prices');
+    updateBtn.addEventListener('click', function() {
+        this.disabled = true;
+        this.textContent = 'Updating...';
+        
+        fetch('{% url "update_prices" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Reload page to show updated values
+                window.location.reload();
+                
+                // Alternatively, update values via JS without reloading
+                // displayAlerts(data.alerts_triggered);
+            } else {
+                alert('Error updating prices: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to update prices. Please try again.');
+        })
+        .finally(() => {
+            this.disabled = false;
+            this.textContent = 'Update Prices';
+        });
+    });
+    
+    // Helper function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    // Display triggered alerts
+    function displayAlerts(alerts) {
+        if (!alerts || alerts.length === 0) return;
+        
+        const container = document.getElementById('alerts-container');
+        const list = document.getElementById('alerts-list');
+        list.innerHTML = '';
+        
+        alerts.forEach(alert => {
+            const item = document.createElement('li');
+            item.innerHTML = `<strong>${alert.position}:</strong> ${alert.type} ${alert.threshold} (Current: ${alert.current_price})`;
+            list.appendChild(item);
+        });
+        
+        container.style.display = 'block';
+    }
+});
+</script>
+
+<style>
+.hp-category {
+    margin-bottom: 20px;
+    background-color: #2a2a2a;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.category-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background-color: #333;
+    cursor: pointer;
+}
+
+.category-content {
+    padding: 0;
+    display: none;
+}
+
+.position-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.position-table th, .position-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #444;
+}
+
+.profit {
+    color: #4caf50;
+}
+
+.loss {
+    color: #f44336;
+}
+
+.action-buttons {
+    margin-bottom: 20px;
+}
+
+.btn {
+    margin-right: 10px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    background-color: #2a2a2a;
+    border-radius: 8px;
+}
+
+.empty-category {
+    padding: 20px;
+    text-align: center;
+    color: #888;
+}
+
+.alerts-container {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #ffeb3b;
+    color: #333;
+    border-radius: 8px;
+}
+
+.alerts-list li {
+    margin-bottom: 8px;
+}
+
+.toggle-icon {
+    margin-left: 10px;
+}
+
+@media (max-width: 768px) {
+    .category-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .category-summary, .category-actions {
+        margin-top: 10px;
+    }
+    
+    .position-table {
+        display: block;
+        overflow-x: auto;
+    }
+}
+</style>
+{% endblock %}

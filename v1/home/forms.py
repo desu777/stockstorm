@@ -1,7 +1,8 @@
 from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
-
+# Znajdź na początku pliku v1/home/forms.py
+from .models import XTBConnection, UserProfile  # Dodaj UserProfile do importu
 
 
 class CustomUserCreationForm(UserCreationForm):

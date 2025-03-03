@@ -1,0 +1,108 @@
+<!-- alert_form.html -->
+{% extends "base.html" %}
+
+{% block title %}
+    {{ title }} | STOCKstorm
+{% endblock %}
+
+{% block content %}
+<div class="app-body-main-content">
+    <h2>{{ title }}</h2>
+    
+    <div class="form-container">
+        <div class="position-info">
+            <h3>Position: {{ position.ticker }}</h3>
+            <p>Current Price: {% if position.current_price %}${{ position.current_price|floatformat:4 }}{% else %}Not available{% endif %}</p>
+            <p>Entry Price: ${{ position.entry_price|floatformat:4 }}</p>
+        </div>
+        
+        <form method="post" class="hp-form">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="{{ form.alert_type.id_for_label }}">Alert Type:</label>
+                {{ form.alert_type }}
+                {% if form.alert_type.errors %}
+                    <div class="form-error">{{ form.alert_type.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-group">
+                <label for="{{ form.threshold_value.id_for_label }}">Threshold Value:</label>
+                {{ form.threshold_value }}
+                <small class="form-help">For price alerts, enter the target price. For percentage alerts, enter the percent (e.g., 30 for 30%)</small>
+                {% if form.threshold_value.errors %}
+                    <div class="form-error">{{ form.threshold_value.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-warning">Create Alert</button>
+                <a href="{% url 'position_detail' position.id %}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.form-container {
+    background-color: #2a2a2a;
+    border-radius: 8px;
+    padding: 20px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.position-info {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #444;
+}
+
+.position-info h3 {
+    margin-top: 0;
+}
+
+.hp-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 5px;
+    color: #ddd;
+}
+
+.form-group input, .form-group textarea, .form-group select {
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #444;
+    background-color: #333;
+    color: #fff;
+}
+
+.form-help {
+    color: #aaa;
+    font-size: 12px;
+    margin-top: 5px;
+}
+
+.form-error {
+    color: #f44336;
+    margin-top: 5px;
+    font-size: 14px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+</style>
+{% endblock %}
