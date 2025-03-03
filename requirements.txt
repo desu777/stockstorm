@@ -12,3 +12,4 @@ djangorestframework-simplejwt>=5.3.0
 requests>=2.31.0  # Wysyłanie żądań HTTP (potrzebne do komunikacji z mikroserwisem)
 python-dotenv>=1.0.0  # Wczytywanie zmiennych środowiskowych (opcjonalne
 python-binance
+twilio>=7.12.0

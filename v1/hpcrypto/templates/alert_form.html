@@ -1,4 +1,4 @@
-<!-- alert_form.html -->
+<!-- Updated alert_form.html -->
 {% extends "base.html" %}
 
 {% block title %}
@@ -15,6 +15,17 @@
             <p>Current Price: {% if position.current_price %}${{ position.current_price|floatformat:4 }}{% else %}Not available{% endif %}</p>
             <p>Entry Price: ${{ position.entry_price|floatformat:4 }}</p>
         </div>
+        
+        {% if user.profile and user.profile.sms_alerts_enabled and user.profile.phone_number %}
+            <div class="sms-alert-info">
+                <i class="fa fa-bell"></i> SMS notifications will be sent to {{ user.profile.phone_number }}
+            </div>
+        {% else %}
+            <div class="sms-alert-warning">
+                <i class="fa fa-exclamation-triangle"></i> SMS notifications are disabled. 
+                <a href="{% url 'profile' %}">Enable SMS alerts in your profile</a>
+            </div>
+        {% endif %}
         
         <form method="post" class="hp-form">
             {% csrf_token %}
@@ -103,6 +114,34 @@
     display: flex;
     gap: 10px;
     margin-top: 10px;
+}
+
+.sms-alert-info {
+    background-color: #2c3e50;
+    border-left: 4px solid #3498db;
+    padding: 10px 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sms-alert-warning {
+    background-color: #462c14;
+    border-left: 4px solid #f39c12;
+    padding: 10px 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sms-alert-warning a {
+    color: #f39c12;
+    text-decoration: underline;
+    margin-left: 5px;
 }
 </style>
 {% endblock %}

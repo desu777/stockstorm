@@ -25,7 +25,7 @@ def position_list(request):
         category.total_pnl_dollar = total_pnl_dollar
         category.total_pnl_percent = (total_pnl_dollar / total_investment * 100) if total_investment else 0
     
-    return render(request, 'hpcrypto/position_list.html', {
+    return render(request, 'position_list.html', {
         'categories': categories,
     })
 
@@ -43,7 +43,7 @@ def add_category(request):
     else:
         form = HPCategoryForm()
     
-    return render(request, 'hpcrypto/category_form.html', {
+    return render(request, 'category_form.html', {
         'form': form,
         'title': 'Add New HP Category'
     })
@@ -61,7 +61,7 @@ def edit_category(request, category_id):
     else:
         form = HPCategoryForm(instance=category)
     
-    return render(request, 'hpcrypto/category_form.html', {
+    return render(request, 'category_form.html', {
         'form': form,
         'title': f'Edit Category: {category.name}'
     })
@@ -76,7 +76,7 @@ def delete_category(request, category_id):
         messages.success(request, f"Category '{name}' and all its positions have been deleted.")
         return redirect('position_list')
     
-    return render(request, 'hpcrypto/confirm_delete.html', {
+    return render(request, 'confirm_delete.html', {
         'object': category,
         'title': f'Delete Category: {category.name}',
         'message': 'This will delete the category and ALL positions within it. This action cannot be undone.'
@@ -110,7 +110,7 @@ def add_position(request):
         form = PositionForm()
         form.fields['category'].queryset = HPCategory.objects.filter(user=request.user)
     
-    return render(request, 'hpcrypto/position_form.html', {
+    return render(request, 'position_form.html', {
         'form': form,
         'title': 'Add New Position'
     })
@@ -129,7 +129,7 @@ def edit_position(request, position_id):
         form = PositionForm(instance=position)
         form.fields['category'].queryset = HPCategory.objects.filter(user=request.user)
     
-    return render(request, 'hpcrypto/position_form.html', {
+    return render(request, 'position_form.html', {
         'form': form,
         'title': f'Edit Position: {position.ticker}',
         'position': position
@@ -145,7 +145,7 @@ def delete_position(request, position_id):
         messages.success(request, f"Position for {ticker} has been deleted.")
         return redirect('position_list')
     
-    return render(request, 'hpcrypto/confirm_delete.html', {
+    return render(request, 'confirm_delete.html', {
         'object': position,
         'title': f'Delete Position: {position.ticker}',
         'message': 'Are you sure you want to delete this position? This action cannot be undone.'
@@ -166,7 +166,7 @@ def add_alert(request, position_id):
     else:
         form = PriceAlertForm()
     
-    return render(request, 'hpcrypto/alert_form.html', {
+    return render(request, 'alert_form.html', {
         'form': form,
         'position': position,
         'title': f'Add Alert for {position.ticker}'
@@ -178,11 +178,12 @@ def position_detail(request, position_id):
     position = get_object_or_404(Position, id=position_id, user=request.user)
     alerts = PriceAlert.objects.filter(position=position)
     
-    return render(request, 'hpcrypto/position_detail.html', {
+    return render(request, 'position_detail.html', {
         'position': position,
         'alerts': alerts
     })
 
+# Updated update_prices view function in hpcrypto/views.py
 @login_required
 @require_POST
 def update_prices(request):
@@ -190,12 +191,13 @@ def update_prices(request):
     # Get user's Binance API credentials
     profile = getattr(request.user, 'profile', None)
     if not profile or not profile.binance_api_key or not profile.binance_api_secret_enc:
-        return JsonResponse({"error": "Binance API credentials not configured"}, status=400)
+        return JsonResponse({"success": False, "error": "Binance API credentials not configured"}, status=400)
     
     # Get all positions for this user
     positions = Position.objects.filter(user=request.user)
     updated_count = 0
     errors = []
+    positions_data = []
     
     for position in positions:
         try:
@@ -206,6 +208,15 @@ def update_prices(request):
                 position.last_price_update = timezone.now()
                 position.save()
                 updated_count += 1
+                
+                # Append position data for frontend update
+                positions_data.append({
+                    'id': position.id,
+                    'current_price': float(position.current_price),
+                    'last_update_timestamp': position.last_price_update.isoformat(),
+                    'pnl_dollar': float(position.profit_loss_dollar) if position.profit_loss_dollar is not None else None,
+                    'pnl_percent': float(position.profit_loss_percent) if position.profit_loss_percent is not None else None
+                })
             else:
                 errors.append(f"Couldn't fetch price for {position.ticker}")
         except Exception as e:
@@ -214,15 +225,39 @@ def update_prices(request):
     # Check alerts
     alerts_triggered = check_price_alerts()
     
+    # Get category summary data
+    categories_data = []
+    categories = HPCategory.objects.filter(user=request.user).prefetch_related('positions')
+    
+    for category in categories:
+        positions = category.positions.all()
+        total_investment = sum(position.position_size for position in positions)
+        total_pnl_dollar = sum(position.profit_loss_dollar or 0 for position in positions)
+        
+        categories_data.append({
+            'id': category.id,
+            'total_investment': float(total_investment),
+            'total_pnl_dollar': float(total_pnl_dollar),
+            'total_pnl_percent': float(total_pnl_dollar / total_investment * 100) if total_investment else 0
+        })
+    
     return JsonResponse({
         "success": True,
         "updated_count": updated_count,
         "errors": errors,
-        "alerts_triggered": alerts_triggered
+        "alerts_triggered": alerts_triggered,
+        "positions_data": positions_data,
+        "categories_data": categories_data
     })
 
+from django.utils import timezone
+from .twilio_utils import send_sms_notification
+import logging
+
+
+
 def check_price_alerts():
-    """Check all active price alerts and mark triggered ones"""
+    """Check all active price alerts and mark triggered ones, send SMS notifications if configured"""
     alerts = PriceAlert.objects.filter(is_active=True, triggered=False)
     triggered = []
     
@@ -246,15 +281,44 @@ def check_price_alerts():
                 trigger = True
         
         if trigger:
+            now = timezone.now()
             alert.triggered = True
-            alert.last_triggered = timezone.now()
+            alert.last_triggered = now
+            
+            # Check if user has SMS notifications enabled
+            user = position.user
+            user_profile = getattr(user, 'profile', None)
+            
+            # Send SMS notification if user has enabled it
+            if (user_profile and 
+                user_profile.sms_alerts_enabled and 
+                user_profile.phone_number and 
+                not alert.sms_sent):
+                
+                # Format message based on alert type
+                message = alert.format_sms_message()
+                
+                # Send SMS
+                success, result = send_sms_notification(user_profile.phone_number, message)
+                
+                if success:
+                    alert.sms_sent = True
+                    alert.last_sms_sent = now
+                    # Log success
+                    logger.info(f"SMS alert sent for {position.ticker} to {user_profile.phone_number}: {result}")
+                else:
+                    # Log error
+                    logger.error(f"Failed to send SMS alert for {position.ticker}: {result}")
+            
             alert.save()
+            
             triggered.append({
                 "id": alert.id,
                 "position": position.ticker,
                 "type": alert.get_alert_type_display(),
                 "threshold": float(alert.threshold_value),
-                "current_price": float(position.current_price)
+                "current_price": float(position.current_price),
+                "sms_sent": alert.sms_sent if user_profile and user_profile.sms_alerts_enabled else None
             })
     
     return triggered

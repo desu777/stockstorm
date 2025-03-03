@@ -5,6 +5,52 @@
     <!-- Existing profile content -->
     <h2>Profile Settings</h2>
     
+    <!-- SMS Notifications Card -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>SMS Notifications</h3>
+        </div>
+        <div class="card-body">
+            <form method="post" class="profile-form">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="sms_settings">
+                
+                <div class="form-group form-check">
+                    <label for="id_sms_alerts_enabled" class="form-check-label">
+                        {{ binance_form.sms_alerts_enabled }}
+                        Enable SMS price alerts
+                    </label>
+                    <small class="form-text text-muted">Receive SMS notifications when your price alerts are triggered</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="id_phone_number">Phone Number:</label>
+                    {{ binance_form.phone_number }}
+                    <small class="form-text text-muted">Include country code (e.g., +1234567890)</small>
+                </div>
+                
+                <button type="submit" class="btn-primary">Save SMS Settings</button>
+            </form>
+            
+            {% if sms_test_result %}
+            <div class="alert {% if sms_test_success %}alert-success{% else %}alert-danger{% endif %} mt-3">
+                {{ sms_test_result }}
+            </div>
+            {% endif %}
+            
+            {% if profile.phone_number and profile.sms_alerts_enabled %}
+            <div class="sms-test-section mt-3">
+                <form method="post" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="test_sms">
+                    <button type="submit" class="btn-secondary">Test SMS</button>
+                </form>
+                <small class="form-text text-muted">Send a test SMS to verify your phone number works correctly</small>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
     <!-- Existing XTB Connection Form -->
     <div class="card mb-4">
         <div class="card-header">
@@ -30,7 +76,7 @@
         </div>
     </div>
     
-    <!-- New Binance API Form -->
+    <!-- Binance API Form -->
     <div class="card">
         <div class="card-header">
             <h3>Binance API Integration</h3>
@@ -67,4 +113,44 @@
         </div>
     </div>
 </div>
+
+<style>
+.form-check {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.form-check-input {
+    margin-right: 10px;
+    width: 20px;
+    height: 20px;
+}
+
+.form-check-label {
+    display: flex;
+    align-items: center;
+}
+
+.sms-test-section {
+    border-top: 1px solid #444;
+    padding-top: 15px;
+}
+
+.alert {
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin-top: 15px;
+}
+
+.alert-success {
+    background-color: rgba(76, 175, 80, 0.2);
+    border-left: 4px solid #4caf50;
+}
+
+.alert-danger {
+    background-color: rgba(244, 67, 54, 0.2);
+    border-left: 4px solid #f44336;
+}
+</style>
 {% endblock %}

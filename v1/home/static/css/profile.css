@@ -1,6 +1,6 @@
 /* Stylizacja kontenera formularza */
 .profile-container {
-    max-width: 500px;
+    max-width: 350px;
     margin: 2rem auto;
     padding: 2rem;
     background-color: #2e2e2e;
@@ -11,8 +11,9 @@
 
 /* Tytuł formularza */
 .profile-container h2 {
+    margin-top: 20px;
     margin-bottom: 20px;
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 700;
     color: var(--c-green-500);
     text-align: center;
@@ -86,4 +87,39 @@
     margin-bottom: 10px;
     font-size: 18px;
     color: var(--c-green-500);
+}
+
+.card, .card-body, .card-header {
+    width: 100%;
+}
+
+/* Ensure the form takes full width */
+.profile-form {
+    width: 100%;
+}
+
+/* Apply styles directly to the inputs as rendered by Django */
+input[type="text"], 
+input[type="password"],
+input[name="xtb_id"],
+input[name="password"],
+input[name="binance_api_key"],
+input[name="binance_api_secret"] {
+    width: 100% !important; /* The !important will override any other width settings */
+    box-sizing: border-box !important;
+    max-width: none !important;
+}
+
+/* Adjust container padding for better proportions */
+.profile-container {
+    width: 100%;
+    max-width: 650px; /* Increased from 500px */
+    box-sizing: border-box;
+    padding: 2rem;
+}
+
+/* Ensure form groups expand fully */
+.form-group {
+    width: 100%;
+    display: block;
 }

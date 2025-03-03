@@ -38,10 +38,12 @@
                 </div>
                 <div class="info-item">
                     <span class="label">Current Price:</span>
-                    <span class="value">
+                    <span class="value" id="current-price-value">
                         {% if position.current_price %}
                             ${{ position.current_price|floatformat:8 }}
-                            <small>({{ position.last_price_update|timesince }} ago)</small>
+                            <small id="last-price-update" data-timestamp="{{ position.last_price_update|date:'c' }}">
+                                ({{ position.last_price_update|timesince }} ago)
+                            </small>
                         {% else %}
                             Not available
                         {% endif %}
@@ -52,8 +54,10 @@
                     <span class="value">
                         {% if position.exit_price %}
                             ${{ position.exit_price|floatformat:8 }}
+                            <span class="position-status">(Position Closed)</span>
                         {% else %}
                             Not set
+                            <span class="position-status">(Position Open)</span>
                         {% endif %}
                     </span>
                 </div>
@@ -63,9 +67,12 @@
                 </div>
                 <div class="info-item">
                     <span class="label">P&L ($):</span>
-                    <span class="value {% if position.profit_loss_dollar >= 0 %}profit{% else %}loss{% endif %}">
+                    <span class="value {% if position.profit_loss_dollar >= 0 %}profit{% else %}loss{% endif %}" id="pnl-dollar">
                         {% if position.profit_loss_dollar %}
                             ${{ position.profit_loss_dollar|floatformat:2 }}
+                            {% if position.exit_price %}
+                                <small>(Final)</small>
+                            {% endif %}
                         {% else %}
                             --
                         {% endif %}
@@ -73,9 +80,12 @@
                 </div>
                 <div class="info-item">
                     <span class="label">P&L (%):</span>
-                    <span class="value {% if position.profit_loss_percent >= 0 %}profit{% else %}loss{% endif %}">
+                    <span class="value {% if position.profit_loss_percent >= 0 %}profit{% else %}loss{% endif %}" id="pnl-percent">
                         {% if position.profit_loss_percent %}
                             {{ position.profit_loss_percent|floatformat:2 }}%
+                            {% if position.exit_price %}
+                                <small>(Final)</small>
+                            {% endif %}
                         {% else %}
                             --
                         {% endif %}
@@ -95,6 +105,17 @@
                 <div class="notes-section">
                     <h4>Notes:</h4>
                     <p>{{ position.notes|linebreaks }}</p>
+                </div>
+            {% endif %}
+            
+            {% if not position.exit_price %}
+                <div class="refresh-section">
+                    <button id="refresh-price" class="btn btn-primary">Refresh Price</button>
+                    <span id="auto-refresh-info">
+                        <input type="checkbox" id="auto-refresh" checked>
+                        <label for="auto-refresh">Auto-refresh (30s)</label>
+                        <span id="refresh-timer" class="refresh-timer">30s</span>
+                    </span>
                 </div>
             {% endif %}
         </div>
@@ -153,6 +174,163 @@
     </div>
 </div>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-refresh functionality for price (only if position is not closed)
+    {% if not position.exit_price %}
+        const refreshButton = document.getElementById('refresh-price');
+        const autoRefreshCheckbox = document.getElementById('auto-refresh');
+        const refreshTimerDisplay = document.getElementById('refresh-timer');
+        let refreshCountdown = 30;
+        let refreshInterval;
+        
+        // Function to start the countdown timer
+        function startRefreshTimer() {
+            refreshCountdown = 30;
+            refreshTimerDisplay.textContent = `${refreshCountdown}s`;
+            
+            clearInterval(refreshInterval); // Clear any existing interval
+            
+            refreshInterval = setInterval(() => {
+                refreshCountdown--;
+                refreshTimerDisplay.textContent = `${refreshCountdown}s`;
+                
+                if (refreshCountdown <= 0) {
+                    refreshPrice();
+                    refreshCountdown = 30;
+                }
+            }, 1000);
+        }
+        
+        // Function to stop the countdown timer
+        function stopRefreshTimer() {
+            clearInterval(refreshInterval);
+            refreshTimerDisplay.textContent = 'Paused';
+        }
+        
+        // Toggle auto-refresh on checkbox change
+        autoRefreshCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                startRefreshTimer();
+            } else {
+                stopRefreshTimer();
+            }
+        });
+        
+        // Initialize timer if auto-refresh is checked
+        if (autoRefreshCheckbox.checked) {
+            startRefreshTimer();
+        }
+        
+        // Manual refresh button
+        refreshButton.addEventListener('click', function() {
+            refreshPrice();
+            if (autoRefreshCheckbox.checked) {
+                refreshCountdown = 30; // Reset countdown after manual refresh
+            }
+        });
+        
+        // Function to refresh price
+        function refreshPrice() {
+            refreshButton.disabled = true;
+            refreshButton.textContent = 'Updating...';
+            
+            fetch('{% url "update_prices" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Find this position's data in the response
+                    const position = data.positions_data.find(p => p.id === {{ position.id }});
+                    if (position) {
+                        updatePositionData(position);
+                    }
+                } else {
+                    console.error('Error updating prices:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            })
+            .finally(() => {
+                refreshButton.disabled = false;
+                refreshButton.textContent = 'Refresh Price';
+            });
+        }
+        
+        // Function to update position data in the UI
+        function updatePositionData(position) {
+            // Update current price
+            const currentPriceElem = document.getElementById('current-price-value');
+            if (currentPriceElem && position.current_price) {
+                currentPriceElem.innerHTML = `${parseFloat(position.current_price).toFixed(8)} <small id="last-price-update" data-timestamp="${position.last_update_timestamp}">(just now)</small>`;
+            }
+            
+            // Update P&L dollar
+            const pnlDollarElem = document.getElementById('pnl-dollar');
+            if (pnlDollarElem && position.pnl_dollar !== null) {
+                pnlDollarElem.textContent = `${parseFloat(position.pnl_dollar).toFixed(2)}`;
+                pnlDollarElem.className = `value ${parseFloat(position.pnl_dollar) >= 0 ? 'profit' : 'loss'}`;
+            }
+            
+            // Update P&L percent
+            const pnlPercentElem = document.getElementById('pnl-percent');
+            if (pnlPercentElem && position.pnl_percent !== null) {
+                pnlPercentElem.textContent = `${parseFloat(position.pnl_percent).toFixed(2)}%`;
+                pnlPercentElem.className = `value ${parseFloat(position.pnl_percent) >= 0 ? 'profit' : 'loss'}`;
+            }
+        }
+    {% endif %}
+    
+    // Helper function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    // Update the "ago" timestamp every minute
+    setInterval(() => {
+        const lastUpdateElem = document.getElementById('last-price-update');
+        if (lastUpdateElem) {
+            const timestamp = new Date(lastUpdateElem.getAttribute('data-timestamp'));
+            const now = new Date();
+            const diffMs = now - timestamp;
+            const diffMins = Math.floor(diffMs / 60000);
+            
+            if (diffMins < 1) {
+                lastUpdateElem.textContent = '(just now)';
+            } else if (diffMins === 1) {
+                lastUpdateElem.textContent = '(1 minute ago)';
+            } else if (diffMins < 60) {
+                lastUpdateElem.textContent = `(${diffMins} minutes ago)`;
+            } else {
+                const diffHours = Math.floor(diffMins / 60);
+                if (diffHours === 1) {
+                    lastUpdateElem.textContent = '(1 hour ago)';
+                } else {
+                    lastUpdateElem.textContent = `(${diffHours} hours ago)`;
+                }
+            }
+        }
+    }, 60000);
+});
+</script>
+
 <style>
 .position-detail-header {
     display: flex;
@@ -208,6 +386,37 @@
     border-top: 1px solid #444;
 }
 
+.refresh-section {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #444;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+#auto-refresh-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.refresh-timer {
+    font-family: monospace;
+    background-color: #333;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    min-width: 35px;
+    text-align: center;
+}
+
+.position-status {
+    font-size: 12px;
+    opacity: 0.8;
+    margin-left: 5px;
+}
+
 .card-header {
     display: flex;
     justify-content: space-between;
@@ -260,6 +469,15 @@
     
     .info-grid {
         grid-template-columns: 1fr;
+    }
+    
+    .refresh-section {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    #auto-refresh-info {
+        margin-top: 10px;
     }
 }
 </style>

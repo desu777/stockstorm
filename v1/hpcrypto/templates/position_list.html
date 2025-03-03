@@ -6,12 +6,17 @@
 
 {% block content %}
 <div class="app-body-main-content">
-    <h2>HP Crypto Positions</h2>
+    <h1>HP Crypto Positions</h1>
     
     <div class="action-buttons">
         <a href="{% url 'add_category' %}" class="btn btn-primary">Add HP Category</a>
         <a href="{% url 'add_position' %}" class="btn btn-success">Add Position</a>
         <button id="update-prices" class="btn btn-info">Update Prices</button>
+        <div class="auto-refresh-control">
+            <input type="checkbox" id="auto-refresh" checked>
+            <label for="auto-refresh">Auto-refresh (30s)</label>
+            <span id="refresh-timer" class="refresh-timer">30s</span>
+        </div>
     </div>
     
     <div id="alerts-container" class="alerts-container" style="display: none;">
@@ -67,7 +72,7 @@
                                             <td class="current-price">
                                                 {% if position.current_price %}
                                                     ${{ position.current_price|floatformat:4 }}
-                                                    <small>{{ position.last_price_update|timesince }} ago</small>
+                                                    <small class="last-update" data-timestamp="{{ position.last_price_update|date:'c' }}">{{ position.last_price_update|timesince }} ago</small>
                                                 {% else %}
                                                     --
                                                 {% endif %}
@@ -141,11 +146,60 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Update prices button
+    // Auto-refresh functionality
+    const autoRefreshCheckbox = document.getElementById('auto-refresh');
+    const refreshTimerDisplay = document.getElementById('refresh-timer');
+    let refreshCountdown = 30;
+    let refreshInterval;
+    
+    // Function to start the countdown timer
+    function startRefreshTimer() {
+        refreshCountdown = 30;
+        refreshTimerDisplay.textContent = `${refreshCountdown}s`;
+        
+        clearInterval(refreshInterval); // Clear any existing interval
+        
+        refreshInterval = setInterval(() => {
+            refreshCountdown--;
+            refreshTimerDisplay.textContent = `${refreshCountdown}s`;
+            
+            if (refreshCountdown <= 0) {
+                fetchLatestPrices();
+                refreshCountdown = 30;
+            }
+        }, 1000);
+    }
+    
+    // Function to stop the countdown timer
+    function stopRefreshTimer() {
+        clearInterval(refreshInterval);
+        refreshTimerDisplay.textContent = 'Paused';
+    }
+    
+    // Toggle auto-refresh on checkbox change
+    autoRefreshCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            startRefreshTimer();
+        } else {
+            stopRefreshTimer();
+        }
+    });
+    
+    // Initialize timer if auto-refresh is checked
+    if (autoRefreshCheckbox.checked) {
+        startRefreshTimer();
+    }
+    
+    // Manual update prices button
     const updateBtn = document.getElementById('update-prices');
     updateBtn.addEventListener('click', function() {
-        this.disabled = true;
-        this.textContent = 'Updating...';
+        fetchLatestPrices();
+    });
+    
+    // Function to fetch latest prices
+    function fetchLatestPrices() {
+        updateBtn.disabled = true;
+        updateBtn.textContent = 'Updating...';
         
         fetch('{% url "update_prices" %}', {
             method: 'POST',
@@ -157,24 +211,81 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Reload page to show updated values
-                window.location.reload();
+                // Update the UI with new price data without page reload
+                updatePositionsData(data.positions_data);
+                updateCategorySummaries(data.categories_data);
                 
-                // Alternatively, update values via JS without reloading
-                // displayAlerts(data.alerts_triggered);
+                // Handle any alerts
+                if (data.alerts_triggered && data.alerts_triggered.length > 0) {
+                    displayAlerts(data.alerts_triggered);
+                }
+                
+                // Reset the countdown
+                if (autoRefreshCheckbox.checked) {
+                    refreshCountdown = 30;
+                }
             } else {
-                alert('Error updating prices: ' + data.error);
+                console.error('Error updating prices:', data.error);
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Failed to update prices. Please try again.');
         })
         .finally(() => {
-            this.disabled = false;
-            this.textContent = 'Update Prices';
+            updateBtn.disabled = false;
+            updateBtn.textContent = 'Update Prices';
         });
-    });
+    }
+    
+    // Function to update position data in the UI
+    function updatePositionsData(positionsData) {
+        if (!positionsData) return;
+        
+        positionsData.forEach(position => {
+            const row = document.querySelector(`tr[data-position-id="${position.id}"]`);
+            if (!row) return;
+            
+            // Update current price cell
+            const currentPriceCell = row.querySelector('.current-price');
+            if (currentPriceCell && position.current_price) {
+                currentPriceCell.innerHTML = `$${parseFloat(position.current_price).toFixed(4)} <small class="last-update" data-timestamp="${position.last_update_timestamp}">just now</small>`;
+            }
+            
+            // Update P&L dollar
+            const pnlDollarCell = row.querySelector('.pnl-dollar');
+            if (pnlDollarCell && position.pnl_dollar !== undefined) {
+                pnlDollarCell.textContent = `$${parseFloat(position.pnl_dollar).toFixed(2)}`;
+                pnlDollarCell.className = `pnl-dollar ${parseFloat(position.pnl_dollar) >= 0 ? 'profit' : 'loss'}`;
+            }
+            
+            // Update P&L percent
+            const pnlPercentCell = row.querySelector('.pnl-percent');
+            if (pnlPercentCell && position.pnl_percent !== undefined) {
+                pnlPercentCell.textContent = `${parseFloat(position.pnl_percent).toFixed(2)}%`;
+                pnlPercentCell.className = `pnl-percent ${parseFloat(position.pnl_percent) >= 0 ? 'profit' : 'loss'}`;
+            }
+        });
+    }
+    
+    // Function to update category summaries
+    function updateCategorySummaries(categoriesData) {
+        if (!categoriesData) return;
+        
+        categoriesData.forEach(category => {
+            const categoryElement = document.querySelector(`#category-${category.id}`).previousElementSibling;
+            if (!categoryElement) return;
+            
+            const summaryElement = categoryElement.querySelector('.category-summary');
+            if (summaryElement) {
+                summaryElement.innerHTML = `
+                    <span>Total Investment: $${parseFloat(category.total_investment).toFixed(2)}</span>
+                    <span class="${parseFloat(category.total_pnl_dollar) >= 0 ? 'profit' : 'loss'}">
+                        P&L: $${parseFloat(category.total_pnl_dollar).toFixed(2)} (${parseFloat(category.total_pnl_percent).toFixed(2)}%)
+                    </span>
+                `;
+            }
+        });
+    }
     
     // Helper function to get CSRF token
     function getCookie(name) {
@@ -208,6 +319,31 @@ document.addEventListener('DOMContentLoaded', function() {
         
         container.style.display = 'block';
     }
+    
+    // Update the "ago" timestamps every minute
+    setInterval(() => {
+        document.querySelectorAll('.last-update').forEach(el => {
+            const timestamp = new Date(el.getAttribute('data-timestamp'));
+            const now = new Date();
+            const diffMs = now - timestamp;
+            const diffMins = Math.floor(diffMs / 60000);
+            
+            if (diffMins < 1) {
+                el.textContent = 'just now';
+            } else if (diffMins === 1) {
+                el.textContent = '1 minute ago';
+            } else if (diffMins < 60) {
+                el.textContent = `${diffMins} minutes ago`;
+            } else {
+                const diffHours = Math.floor(diffMins / 60);
+                if (diffHours === 1) {
+                    el.textContent = '1 hour ago';
+                } else {
+                    el.textContent = `${diffHours} hours ago`;
+                }
+            }
+        });
+    }, 60000);
 });
 </script>
 
@@ -254,6 +390,34 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .action-buttons {
     margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.auto-refresh-control {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+    gap: 8px;
+    padding: 5px 10px;
+    background-color: #2a2a2a;
+    border-radius: 5px;
+}
+
+.refresh-timer {
+    font-family: monospace;
+    background-color: #333;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    min-width: 35px;
+    text-align: center;
+}
+
+.h1{
+    size: 20px;
 }
 
 .btn {
@@ -302,6 +466,13 @@ document.addEventListener('DOMContentLoaded', function() {
     .position-table {
         display: block;
         overflow-x: auto;
+    }
+    
+    .auto-refresh-control {
+        margin-left: 0;
+        margin-top: 10px;
+        width: 100%;
+        justify-content: center;
     }
 }
 </style>
