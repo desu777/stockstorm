@@ -8,7 +8,7 @@
     <!-- Push Notifications Card -->
     <div class="card mb-4">
         <div class="card-header">
-            <h3>Push Notifications</h3>
+            <h3><i class="fas fa-bell fa-fw"></i> Push Notifications</h3>
         </div>
         <div class="card-body">
             <form method="post" class="profile-form">
@@ -33,7 +33,7 @@
     <!-- Existing XTB Connection Form -->
     <div class="card mb-4">
         <div class="card-header">
-            <h3>XTB Connection</h3>
+            <h3><i class="fas fa-plug fa-fw"></i> XTB Connection</h3>
         </div>
         <div class="card-body">
             <form method="post" class="profile-form">
@@ -58,7 +58,7 @@
     <!-- Binance API Form -->
     <div class="card">
         <div class="card-header">
-            <h3>Binance API Integration</h3>
+            <h3><i class="fas fa-bitcoin-sign fa-fw"></i> Binance API Integration</h3>
         </div>
         <div class="card-body">
             <form method="post" class="profile-form">
@@ -76,11 +76,6 @@
                     <small class="form-text text-muted">Your secret will be encrypted in the database.</small>
                 </div>
                 
-                <div class="form-check mb-3">
-                    <input type="checkbox" class="form-check-input" id="test_connection" name="test_connection">
-                    <label class="form-check-label" for="test_connection">Test connection before saving</label>
-                </div>
-                
                 <button type="submit" class="btn-primary">Save Binance Settings</button>
             </form>
             
@@ -94,6 +89,25 @@
 </div>
 
 <style>
+.form-group form-text text-muted{
+    color: aliceblue;
+}
+.id_push_notifications_enabled{
+    color: aliceblue;
+}
+
+.card-header h3{
+    margin-top: 3rem;
+    margin-bottom: 2rem;
+    font-size: 20px;
+    color: aliceblue;
+}
+
+.card-header h3 i {
+    margin-right: 10px;
+    color: #45ffbc; /* Twój zielony kolor z motywu */
+}
+
 .form-check {
     display: flex;
     align-items: center;
