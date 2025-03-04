@@ -8,6 +8,7 @@ from .models import HPCategory, Position, PriceAlert
 from .forms import HPCategoryForm, PositionForm, PriceAlertForm
 from home.models import UserProfile
 from django.views.decorators.http import require_POST
+from .onesignal_utils import send_onesignal_notification
 
 @login_required
 def position_list(request):
