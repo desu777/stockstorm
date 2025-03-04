@@ -35,10 +35,13 @@
           <!-- Szczegóły bota -->
           <a href="{% url 'bot_detail' bot.id %}">Details</a>
           <!-- Usuń / zatrzymaj bota -->
-          <form action="{% url 'bot_remove' bot.id %}" method="post" style="display:inline;">
-            {% csrf_token %}
-            <button type="submit">Delete</button>
-          </form>
+          <button 
+            class="delete-bot-button" 
+            data-bot-id="{{ bot.id }}" 
+            data-bot-name="{{ bot.name }}"
+            data-delete-url="{% url 'bot_remove' bot.id %}">
+            Delete
+          </button>
         </td>
       </tr>
       {% empty %}
@@ -49,6 +52,9 @@
     </tbody>
   </table>
 </div>
+
+<!-- Include the delete confirmation modal -->
+{% include "delete_confirmation_modal.html" %}
 
 <script>
   document.addEventListener('DOMContentLoaded', function() {

@@ -157,3 +157,11 @@ BNB_MICROSERVICE_URL="http://127.0.0.1:8006"
 XTB_D ="http://127.0.0.1:8004"
 
 
+
+# Session settings
+SESSION_COOKIE_AGE = 1209600  # 2 weeks in seconds
+SESSION_SAVE_EVERY_REQUEST = True
+
+# To ensure cookies work properly
+CSRF_COOKIE_SECURE = False  # Set to True in production with HTTPS
+SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS

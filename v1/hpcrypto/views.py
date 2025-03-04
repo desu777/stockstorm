@@ -251,9 +251,7 @@ def update_prices(request):
         "categories_data": categories_data
     })
 
-from django.utils import timezone
-from .twilio_utils import send_sms_notification
-import logging
+
 
 
 

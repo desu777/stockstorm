@@ -1,0 +1,137 @@
+<!-- delete_confirmation_modal.html -->
+<div id="deleteModal" class="modal">
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2>Confirm Deletion</h2>
+      <p>Are you sure you want to delete bot <span id="botName"></span>?</p>
+      <p class="warning">This action cannot be undone and will stop all trading operations for this bot.</p>
+      
+      <div class="modal-actions">
+        <button id="cancelDelete" class="cancel-button">Cancel</button>
+        <form id="deleteForm" method="post">
+          {% csrf_token %}
+          <button type="submit" class="delete-button">Delete Bot</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  
+  <style>
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .modal-content {
+      background-color: #1c1c27;
+      padding: 25px;
+      border-radius: 8px;
+      width: 400px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      border: 1px solid #343446;
+    }
+    
+    .close-button {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    
+    .close-button:hover {
+      color: #fff;
+    }
+    
+    .warning {
+      color: #ff6b6b;
+      font-size: 14px;
+      margin: 15px 0;
+    }
+    
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    
+    .cancel-button {
+      background-color: transparent;
+      border: 1px solid #777;
+      color: #ccc;
+      padding: 8px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .delete-button {
+      background-color: #e74c3c;
+      border: none;
+      color: white;
+      padding: 8px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .cancel-button:hover {
+      background-color: #444;
+    }
+    
+    .delete-button:hover {
+      background-color: #c0392b;
+    }
+  </style>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Get modal element
+      const modal = document.getElementById('deleteModal');
+      const closeButton = document.querySelector('.close-button');
+      const cancelButton = document.getElementById('cancelDelete');
+      const deleteForm = document.getElementById('deleteForm');
+      const botNameSpan = document.getElementById('botName');
+      
+      // Close modal functions
+      function closeModal() {
+        modal.style.display = "none";
+      }
+      
+      // Close when clicking X or Cancel
+      closeButton.addEventListener('click', closeModal);
+      cancelButton.addEventListener('click', closeModal);
+      
+      // Close when clicking outside the modal
+      window.addEventListener('click', function(event) {
+        if (event.target == modal) {
+          closeModal();
+        }
+      });
+      
+      // Add event listeners to all delete buttons
+      document.querySelectorAll('.delete-bot-button').forEach(button => {
+        button.addEventListener('click', function(e) {
+          e.preventDefault();
+          
+          const botId = this.getAttribute('data-bot-id');
+          const botName = this.getAttribute('data-bot-name');
+          const deleteUrl = this.getAttribute('data-delete-url');
+          
+          // Update modal content
+          botNameSpan.textContent = botName;
+          deleteForm.action = deleteUrl;
+          
+          // Display the modal
+          modal.style.display = "flex";
+        });
+      });
+    });
+  </script>

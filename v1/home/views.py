@@ -27,7 +27,35 @@ from io import StringIO
 from .models import UserProfile
 
 logger = logging.getLogger(__name__)
-
+def custom_login_view(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        remember_me = request.POST.get('remember') == 'yes'
+        next_url = request.POST.get('next', '/dashboard/')
+        
+        user = authenticate(username=username, password=password)
+        
+        if user is not None:
+            login(request, user)
+            
+            # Set session expiry based on remember_me
+            if remember_me:
+                # Session will last for 2 weeks (60*60*24*14 seconds)
+                request.session.set_expiry(1209600)
+            else:
+                # Session will end when the browser is closed
+                request.session.set_expiry(0)
+                
+            return redirect(next_url)
+        else:
+            # Return error message for invalid login
+            return render(request, 'login.html', {
+                'form': {'errors': True},
+                'next': next_url,
+            })
+    
+    return render(request, 'login.html')
 
 def home(request):
     return render(request, 'home.html')
@@ -77,7 +105,7 @@ def profile_view(request):
         form_type = request.POST.get('form_type')
         
         if form_type == 'xtb_connection':
-            # Handle the existing XTB connection form
+            # Handle the XTB connection form
             xtb_form = XTBConnectionForm(request.POST, instance=getattr(request.user, 'xtb_connection', None))
             if xtb_form.is_valid():
                 connection = xtb_form.save(commit=False)
@@ -96,43 +124,45 @@ def profile_view(request):
             # Handle the Binance API form
             binance_form = BinanceApiForm(request.POST, instance=profile)
             if binance_form.is_valid():
-                test_connection = request.POST.get('test_connection') == 'on'
+                # Critical fix: Only update the fields from this form
+                binance_api_key = binance_form.cleaned_data.get('binance_api_key')
+                binance_api_secret = request.POST.get('binance_api_secret')
                 
-                if test_connection:
-                    # Test the Binance connection
-                    api_key = binance_form.cleaned_data['binance_api_key']
-                    api_secret = request.POST.get('binance_api_secret')
-                    
-                    # If no new secret provided but we have one stored, use the stored one
-                    if not api_secret and profile.binance_api_secret_enc:
-                        api_secret = profile.get_binance_api_secret()
-                    
-                    # Only test if we have both key and secret
-                    if api_key and api_secret:
-                        binance_status = test_binance_connection(api_key, api_secret)
-                        
-                        if "Success" not in binance_status:
-                            # Show error but don't save invalid credentials
-                            messages.error(request, f"Binance connection failed: {binance_status}")
-                            return render(request, 'profile.html', {
-                                'xtb_form': xtb_form,
-                                'binance_form': binance_form,
-                                'binance_status': binance_status,
-                                'session_id': getattr(getattr(request.user, 'xtb_connection', None), 'stream_session_id', None)
-                            })
+                # Keep push notification state
+                push_enabled = profile.push_notifications_enabled
+                player_id = profile.onesignal_player_id
                 
-                # Save the form (only saves key, secret is handled separately)
-                profile = binance_form.save()
+                # Save the form (only modifies API key fields)
+                profile = binance_form.save(commit=False)
+                
+                # Restore the notification settings
+                profile.push_notifications_enabled = push_enabled
+                profile.onesignal_player_id = player_id
+                
+                # Handle secret separately if provided
+                if binance_api_secret:
+                    profile.set_binance_api_secret(binance_api_secret)
+                    
+                profile.save()
                 messages.success(request, "Binance API settings saved successfully!")
                 return redirect('profile')
                 
         elif form_type == 'notification_settings':
             # Handle notification settings form
-            binance_form = BinanceApiForm(request.POST, instance=profile)
-            if binance_form.is_valid():
-                profile = binance_form.save()
-                messages.success(request, "Notification settings saved successfully!")
-                return redirect('profile')
+            # Keep existing API credentials
+            api_key = profile.binance_api_key
+            api_secret_enc = profile.binance_api_secret_enc
+            
+            # Update notification settings
+            profile.push_notifications_enabled = request.POST.get('push_notifications_enabled') == 'on'
+            
+            # Preserve API credentials
+            profile.binance_api_key = api_key
+            profile.binance_api_secret_enc = api_secret_enc
+            
+            profile.save()
+            messages.success(request, "Notification settings saved successfully!")
+            return redirect('profile')
     
     # Get XTB session_id for display
     session_id = getattr(getattr(request.user, 'xtb_connection', None), 'stream_session_id', None)
