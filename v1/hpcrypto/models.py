@@ -82,6 +82,12 @@ class PriceAlert(models.Model):
     notification_sent = models.BooleanField(default=False)
     last_notification_sent = models.DateTimeField(blank=True, null=True)
     
+    # Add the missing SMS field
+    sms_sent = models.BooleanField(default=False)
+    
+    def __str__(self):
+        return f"{self.get_alert_type_display()} @ {self.threshold_value} for {self.position.ticker}"
+    
     def __str__(self):
         return f"{self.get_alert_type_display()} @ {self.threshold_value} for {self.position.ticker}"
     
