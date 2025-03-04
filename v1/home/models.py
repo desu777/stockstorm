@@ -200,6 +200,7 @@ class Bot(models.Model):
 
 
 # Update UserProfile model in home/models.py
+# Updated UserProfile model in home/models.py
 class UserProfile(models.Model):
     # Existing fields
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
@@ -208,9 +209,9 @@ class UserProfile(models.Model):
     binance_api_key = models.CharField(max_length=255, blank=True, null=True)
     binance_api_secret_enc = models.BinaryField(blank=True, null=True)
     
-    # Add phone number field for SMS alerts
-    phone_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="Phone Number for SMS Alerts")
-    sms_alerts_enabled = models.BooleanField(default=False, verbose_name="Enable SMS Alerts")
+    # OneSignal notification preferences
+    push_notifications_enabled = models.BooleanField(default=True, verbose_name="Enable Push Notifications")
+    onesignal_player_id = models.CharField(max_length=255, blank=True, null=True, verbose_name="OneSignal Player ID")
     
     def set_binance_api_secret(self, plain_secret):
         """Encrypts and stores the Binance API secret"""

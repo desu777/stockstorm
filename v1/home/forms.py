@@ -64,14 +64,10 @@ class BinanceApiForm(forms.ModelForm):
     
     class Meta:
         model = UserProfile
-        fields = ['binance_api_key', 'phone_number', 'sms_alerts_enabled']
+        fields = ['binance_api_key', 'push_notifications_enabled']
         widgets = {
             'binance_api_key': forms.TextInput(attrs={'class': 'form-control'}),
-            'phone_number': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': '+1234567890'
-            }),
-            'sms_alerts_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'push_notifications_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
     
     def save(self, commit=True):

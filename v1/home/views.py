@@ -72,8 +72,6 @@ def profile_view(request):
     binance_form = BinanceApiForm(instance=profile)
     
     binance_status = None  # Will store connection test result
-    sms_test_result = None
-    sms_test_success = False
     
     if request.method == 'POST':
         form_type = request.POST.get('form_type')
@@ -128,30 +126,13 @@ def profile_view(request):
                 messages.success(request, "Binance API settings saved successfully!")
                 return redirect('profile')
                 
-        elif form_type == 'sms_settings':
-            # Handle SMS settings form
+        elif form_type == 'notification_settings':
+            # Handle notification settings form
             binance_form = BinanceApiForm(request.POST, instance=profile)
             if binance_form.is_valid():
                 profile = binance_form.save()
-                messages.success(request, "SMS notification settings saved successfully!")
+                messages.success(request, "Notification settings saved successfully!")
                 return redirect('profile')
-                
-        elif form_type == 'test_sms':
-            # Send a test SMS
-            from hpcrypto.twilio_utils import send_sms_notification
-            if profile.phone_number and profile.sms_alerts_enabled:
-                success, result = send_sms_notification(
-                    profile.phone_number,
-                    "This is a test message from STOCKstorm. Your SMS alerts are configured correctly!"
-                )
-                sms_test_success = success
-                if success:
-                    sms_test_result = "Test SMS sent successfully!"
-                else:
-                    sms_test_result = f"Failed to send test SMS: {result}"
-            else:
-                sms_test_result = "SMS alerts are not properly configured. Please save your phone number and enable SMS alerts."
-                sms_test_success = False
     
     # Get XTB session_id for display
     session_id = getattr(getattr(request.user, 'xtb_connection', None), 'stream_session_id', None)
@@ -160,9 +141,7 @@ def profile_view(request):
         'xtb_form': xtb_form,
         'binance_form': binance_form,
         'binance_status': binance_status,
-        'session_id': session_id,
-        'sms_test_result': sms_test_result,
-        'sms_test_success': sms_test_success
+        'session_id': session_id
     })
 
 

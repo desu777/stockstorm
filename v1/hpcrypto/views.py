@@ -257,7 +257,7 @@ import logging
 
 
 def check_price_alerts():
-    """Check all active price alerts and mark triggered ones, send SMS notifications if configured"""
+    """Check all active price alerts and mark triggered ones, send push notifications if configured"""
     alerts = PriceAlert.objects.filter(is_active=True, triggered=False)
     triggered = []
     
@@ -285,30 +285,44 @@ def check_price_alerts():
             alert.triggered = True
             alert.last_triggered = now
             
-            # Check if user has SMS notifications enabled
+            # Check if user has push notifications enabled
             user = position.user
             user_profile = getattr(user, 'profile', None)
             
-            # Send SMS notification if user has enabled it
+            # Send push notification if user has enabled it
             if (user_profile and 
-                user_profile.sms_alerts_enabled and 
-                user_profile.phone_number and 
-                not alert.sms_sent):
+                user_profile.push_notifications_enabled and 
+                not alert.notification_sent):
                 
                 # Format message based on alert type
-                message = alert.format_sms_message()
+                message = alert.format_notification_message()
+                title = f"STOCKstorm: {position.ticker} Alert Triggered"
                 
-                # Send SMS
-                success, result = send_sms_notification(user_profile.phone_number, message)
+                # Additional data for the notification
+                data = {
+                    "alert_id": alert.id,
+                    "position_id": position.id,
+                    "ticker": position.ticker,
+                    "current_price": float(position.current_price)
+                }
+                
+                # Use OneSignal to send notification to user
+                success, result = send_onesignal_notification(
+                    user_id=user.id,
+                    message=message,
+                    title=title,
+                    url=f"/hpcrypto/position/{position.id}/",
+                    data=data
+                )
                 
                 if success:
-                    alert.sms_sent = True
-                    alert.last_sms_sent = now
+                    alert.notification_sent = True
+                    alert.last_notification_sent = now
                     # Log success
-                    logger.info(f"SMS alert sent for {position.ticker} to {user_profile.phone_number}: {result}")
+                    logger.info(f"Push notification sent for {position.ticker} to user {user.id}: {result}")
                 else:
                     # Log error
-                    logger.error(f"Failed to send SMS alert for {position.ticker}: {result}")
+                    logger.error(f"Failed to send push notification for {position.ticker}: {result}")
             
             alert.save()
             
@@ -318,7 +332,7 @@ def check_price_alerts():
                 "type": alert.get_alert_type_display(),
                 "threshold": float(alert.threshold_value),
                 "current_price": float(position.current_price),
-                "sms_sent": alert.sms_sent if user_profile and user_profile.sms_alerts_enabled else None
+                "notification_sent": alert.notification_sent
             })
     
     return triggered

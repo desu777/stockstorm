@@ -61,7 +61,6 @@ class Position(models.Model):
         ordering = ['-created_at']
 
 
-# Updated PriceAlert model in hpcrypto/models.py
 class PriceAlert(models.Model):
     """Model for price alerts on positions"""
     ALERT_TYPES = (
@@ -79,28 +78,28 @@ class PriceAlert(models.Model):
     last_triggered = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
-    # Fields for SMS notifications
-    sms_sent = models.BooleanField(default=False)
-    last_sms_sent = models.DateTimeField(blank=True, null=True)
+    # Fields for OneSignal notifications
+    notification_sent = models.BooleanField(default=False)
+    last_notification_sent = models.DateTimeField(blank=True, null=True)
     
     def __str__(self):
         return f"{self.get_alert_type_display()} @ {self.threshold_value} for {self.position.ticker}"
     
-    def format_sms_message(self):
-        """Format SMS message based on alert type and threshold"""
+    def format_notification_message(self):
+        """Format notification message based on alert type and threshold"""
         position = self.position
         ticker = position.ticker
         current_price = position.current_price
         
         if self.alert_type == 'PRICE_ABOVE':
-            return f"ALERT: {ticker} price is now ${current_price:.4f}, above your ${self.threshold_value:.4f} threshold."
+            return f"{ticker} price is now ${current_price:.4f}, above your ${self.threshold_value:.4f} threshold."
         elif self.alert_type == 'PRICE_BELOW':
-            return f"ALERT: {ticker} price is now ${current_price:.4f}, below your ${self.threshold_value:.4f} threshold."
+            return f"{ticker} price is now ${current_price:.4f}, below your ${self.threshold_value:.4f} threshold."
         elif self.alert_type == 'PCT_INCREASE':
             pct_change = ((current_price - position.entry_price) / position.entry_price) * 100
-            return f"ALERT: {ticker} increased by {pct_change:.2f}%, above your {self.threshold_value:.2f}% threshold. Current price: ${current_price:.4f}"
+            return f"{ticker} increased by {pct_change:.2f}%, above your {self.threshold_value:.2f}% threshold. Current price: ${current_price:.4f}"
         elif self.alert_type == 'PCT_DECREASE':
             pct_change = ((position.entry_price - current_price) / position.entry_price) * 100
-            return f"ALERT: {ticker} decreased by {pct_change:.2f}%, above your {self.threshold_value:.2f}% threshold. Current price: ${current_price:.4f}"
+            return f"{ticker} decreased by {pct_change:.2f}%, above your {self.threshold_value:.2f}% threshold. Current price: ${current_price:.4f}"
         
-        return f"ALERT: {ticker} price alert triggered. Current price: ${current_price:.4f}"
+        return f"{ticker} price alert triggered. Current price: ${current_price:.4f}"
